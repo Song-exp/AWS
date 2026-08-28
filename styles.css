@@ -11,6 +11,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0;
   color: var(--ink);
@@ -172,3 +173,153 @@ h2 span { color: var(--accent); }
   .store-logo { width: 42px; height: 42px; flex-basis: 42px; }
   .discount { font-size: 22px; }
 }
+
+/* ═══════════════════════════════════════════
+   온보딩 화면
+   ═══════════════════════════════════════════ */
+.onboarding {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  overflow: hidden;
+}
+.onboarding-inner {
+  flex: 1;
+  overflow-y: auto;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 44px 20px 120px;
+}
+.onboarding-head { margin-bottom: 30px; }
+.onboarding-head h1 { font-size: clamp(28px, 5vw, 42px); line-height: 1.2; letter-spacing: -1.6px; }
+.onboarding-head h1 strong { color: var(--accent); }
+.onboarding-sub { margin: 16px 0 0; color: var(--muted); font-size: 14px; }
+
+.ob-group { margin-bottom: 26px; }
+.ob-group h3 {
+  display: flex; align-items: center; gap: 7px;
+  margin: 0 0 13px; padding-bottom: 9px;
+  font-size: 15px; font-weight: 800;
+  border-bottom: 1px solid var(--line);
+}
+.ob-issuer { margin-bottom: 12px; }
+.ob-issuer-label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.ob-grid { display: flex; flex-wrap: wrap; gap: 9px; }
+.ob-chip {
+  border: 1.5px solid var(--line);
+  border-radius: 13px;
+  background: var(--white);
+  padding: 11px 15px;
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all .14s ease;
+}
+.ob-chip:hover { border-color: var(--accent); }
+.ob-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 800;
+}
+.onboarding-footer {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 16px 20px;
+  background: rgba(255,255,255,.95);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+.primary-button.wide {
+  display: block;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 16px;
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+/* ═══════════════════════════════════════════
+   업종 마커 (카페/음식점/편의점)
+   ═══════════════════════════════════════════ */
+.cat-marker {
+  display: grid;
+  place-items: center;
+  width: 40px; height: 40px;
+  border-radius: 50% 50% 50% 2px;
+  background: var(--marker-color, #5b5ce2);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 900;
+  box-shadow: 0 3px 8px rgba(17,24,39,.35);
+  border: 2.5px solid #fff;
+}
+.marker-badge {
+  position: absolute;
+  left: 50%; top: -14px;
+  transform: translateX(-50%);
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(17,24,39,.28);
+}
+.map-popup-offer.best strong { color: var(--accent); }
+.map-popup-offer.best span { font-weight: 800; }
+
+/* ═══════════════════════════════════════════
+   추천 카드 (리스트)
+   ═══════════════════════════════════════════ */
+.store-logo { font-size: 18px; }
+.pay-badge.best-pay { color: #fff; background: var(--accent); }
+.stack-ok { color: #16a34a; }
+.stack-no { color: #dc2626; }
+.other-recs {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px dashed var(--line);
+  display: grid;
+  gap: 6px;
+}
+.other-recs li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.other-recs li em { font-style: normal; font-weight: 700; color: #4b5563; }
+.my-methods-chip { font-weight: 700; color: var(--accent); }
+
+.method-filter .mf-emoji { margin-right: 3px; }
+.method-filter[aria-pressed="false"] { opacity: .55; }
+
+.verify-tag { margin-left: 6px; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 800; vertical-align: middle; background: #fff4e5; color: #b45309; }
+.verify-tag.ok { background: #e7f7ed; color: #16a34a; }
+
+/* 최적 조합 UI */
+.map-popup-best { display: flex; align-items: baseline; gap: 8px; padding: 8px 0 4px; font-size: 12px; font-weight: 800; color: var(--accent); border-top: 1px solid var(--line); }
+.map-popup-best b { font-size: 17px; }
+.popup-spend { margin-left: auto; color: var(--muted); font-weight: 600; font-size: 10px; }
+.plan-parts { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.plan-parts li { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+.plan-parts li span { color: #374151; font-weight: 600; }
+.plan-parts li em { font-style: normal; font-weight: 800; color: var(--accent); white-space: nowrap; }
+.alt-label { margin: 10px 0 4px; font-size: 11px; color: var(--muted); font-weight: 700; }
+.other-recs li.alt { opacity: .8; }
+.verify-tag.mini { font-size: 9px; padding: 1px 4px; margin-left: 4px; }
+
+/* 온보딩 프로필(멤버십/등급) */
+.ob-profile h3 small { margin-left: 4px; font-size: 11px; font-weight: 600; color: var(--muted); }
+.ob-profile-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.ob-profile-label { min-width: 120px; font-size: 13px; font-weight: 700; color: #374151; }
+
+.ob-grade-hint { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
