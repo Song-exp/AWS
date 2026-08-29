@@ -25,6 +25,7 @@ from app.scripts.seed_card_benefits import seed as seed_card_benefits
 from app.scripts.seed_category_stores import seed as seed_category_stores
 from app.scripts.seed_sample_scholarships import seed as seed_sample_scholarships
 from app.scripts.seed_stores import seed as seed_stores
+from app.scripts.seed_local_benefits import seed as seed_local_benefits
 
 ScholarshipMode = Literal["sample", "crawl", "skip"]
 
@@ -73,6 +74,7 @@ def initialize_all(
     result = {
         "stores": seed_stores(),
         "category_stores": seed_category_stores(),
+        "local_benefits": seed_local_benefits(),
         "card_benefits": seed_card_benefits(),
     }
 

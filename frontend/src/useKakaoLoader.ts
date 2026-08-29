@@ -18,7 +18,7 @@ let sdkPromise: Promise<void> | null = null;
 
 function loadKakaoSdk(appKey: string): Promise<void> {
   // 이미 사용 가능하면 즉시 완료
-  if (window.kakao?.maps?.Map) return Promise.resolve();
+  if (window.kakao?.maps?.Map && window.kakao?.maps?.services) return Promise.resolve();
   if (sdkPromise) return sdkPromise;
 
   sdkPromise = new Promise<void>((resolve, reject) => {
@@ -52,7 +52,7 @@ function loadKakaoSdk(appKey: string): Promise<void> {
 
     const script = document.createElement("script");
     script.id = "kakao-map-sdk";
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false&libraries=services`;
     script.async = true;
     script.addEventListener("load", finish, { once: true });
     script.addEventListener(
@@ -77,7 +77,7 @@ function loadKakaoSdk(appKey: string): Promise<void> {
 
 export function useKakaoLoader(appKey: string | undefined) {
   const [ready, setReady] = useState<boolean>(
-    () => !!window.kakao?.maps?.Map
+    () => !!window.kakao?.maps?.Map && !!window.kakao?.maps?.services
   );
   const [error, setError] = useState<string | null>(null);
 

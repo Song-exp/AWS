@@ -34,8 +34,10 @@ export interface ChatRequest {
   message: string;
 }
 
-// ===== 지도(페이픽) =====
+// ===== 지도(TMI) =====
 export type PayMethod = "kakao" | "toss" | "naver";
+export type StudentCredential = "student_card" | "student_tok";
+export type BenefitProgram = "khu_alliance" | "onnuri" | "seoulpay" | "zeropay";
 
 export type StoreCategory =
   | "convenience"
@@ -101,6 +103,48 @@ export interface Store {
   max_discount_rate: number;
   max_card_discount_rate: number;
   best_deal: BestDeal | null;
+  local_benefits?: LocalBenefit[];
+}
+
+export interface LocalBenefit {
+  id: number;
+  source_key: string;
+  merchant_name: string;
+  category: StoreCategory;
+  category_label: string | null;
+  address: string | null;
+  search_query: string;
+  lat: number | null;
+  lng: number | null;
+  source_type: string;
+  programs: BenefitProgram[];
+  credentials: StudentCredential[];
+  requires: string | null;
+  benefit_text: string;
+  discount_type: string | null;
+  discount_value: number | null;
+  min_spend: number | null;
+  max_amount: number | null;
+  conditions: string | null;
+  valid_to: string | null;
+  confidence: string | null;
+  source_url: string | null;
+}
+
+export interface LocalBenefitsPage {
+  items: LocalBenefit[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface LocalBenefitParams {
+  programs?: BenefitProgram[];
+  credentials?: StudentCredential[];
+  category?: StoreCategory[];
+  q?: string;
+  offset?: number;
+  limit?: number;
 }
 
 export interface NearbyParams {
@@ -131,20 +175,43 @@ export interface CategoryOption {
   label: string;
 }
 
+export interface ProfileOption {
+  value: string;
+  label: string;
+}
+
 export interface MetaOptions {
   cards: CardOption[];
   pay_methods: PayOption[];
   categories: CategoryOption[];
   telecoms: string[];
   telecom_supported: boolean;
+  student_credentials: ProfileOption[];
+  benefit_programs: ProfileOption[];
 }
 
-/** 온보딩에서 수집하는 내 정보(localStorage 저장) */
-export interface UserProfileLocal {
-  userId: string;
+/** 온보딩에서 수집하는 성별(localStorage 저장) */
+export type Gender = "male" | "female";
+
+/** 온보딩 사용자(나)와 시연용 3명을 포함한 페르소나 식별자 */
+export type PersonaId = "me" | "demo_a" | "demo_b" | "demo_c";
+
+/** 페르소나마다 전환되는 혜택 설정 */
+export interface ProfileSettings {
+  gender: Gender | null;
   cardIds: number[];
   telecom: string | null;
   payMethods: PayMethod[];
+  studentCredentials: StudentCredential[];
+  benefitPrograms: BenefitProgram[];
+}
+
+/** 온보딩에서 수집하는 내 정보(localStorage 저장) */
+export interface UserProfileLocal extends ProfileSettings {
+  userId: string;
+  personaId: PersonaId;
+  /** 데모 페르소나를 보다가 '나'로 돌아올 때 복원할 실제 사용자 설정 */
+  personalProfile: ProfileSettings;
 }
 
 // ===== 마이페이지 =====

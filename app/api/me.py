@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -57,7 +57,7 @@ class MyPageOut(BaseModel):
 @router.get("/summary", response_model=MyPageOut)
 def my_summary(
     user_id: uuid.UUID,
-    card_ids: list[int] | None = None,
+    card_ids: list[int] | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> MyPageOut:
     """마이페이지 한 번에 조회: 신청이력 + 자기소개서 + 보유카드.

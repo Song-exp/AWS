@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// 페이픽 + 거지앱 통합 데이터 (2026-08 기준 MVP 예시)
+// TMI + 거지앱 통합 데이터 (2026-08 기준 MVP 예시)
 // 범위: 경희대 ~ 회기역 ~ 외대앞 일대
 // ═══════════════════════════════════════════════════════════
 
@@ -65,6 +65,9 @@ const DEMO_USERS = [
   {
     id: 'demo_a',
     name: '민지 · 카페·문화형',
+    gender: 'female',
+    savingsAmount: 184500,
+    scholarshipAmount: 3500000,
     cardLabel: 'KB 펭수 노리 카드',
     owned: ['khu_alliance', 'student_tok', 'telecom_skt', 'pay_kakao', 'pay_naver', 'kb_pengsoo'],
     preferences: ['cafe', 'culture', 'convenience'],
@@ -73,6 +76,9 @@ const DEMO_USERS = [
   {
     id: 'demo_b',
     name: '준호 · 학교생활형',
+    gender: 'male',
+    savingsAmount: 271800,
+    scholarshipAmount: 5000000,
     cardLabel: '하나 네이버페이머니',
     owned: ['khu_alliance', 'student_card', 'telecom_kt', 'pay_naver', 'hana_naverpay', 'local_seoul'],
     preferences: ['campus', 'restaurant', 'lifestyle'],
@@ -81,6 +87,9 @@ const DEMO_USERS = [
   {
     id: 'demo_c',
     name: '서연 · 생활절약형',
+    gender: 'female',
+    savingsAmount: 392400,
+    scholarshipAmount: 4200000,
     cardLabel: '올리브영 현대카드 Plus',
     owned: ['student_card', 'telecom_lgu', 'pay_toss', 'hyundai_oliveyoung_plus', 'local_seoul', 'local_onnuri'],
     preferences: ['lifestyle', 'convenience', 'restaurant'],
@@ -107,7 +116,7 @@ const CATEGORY_LABELS = {
 // ─── 매장 데이터 (편의점 + 카페 + 음식점) ───
 // storeCategory: 'convenience' | 'cafe' | 'restaurant'
 const STORES = [
-  // ═══ 편의점 (페이픽 기존 데이터) ═══
+  // ═══ 편의점 (TMI 기존 데이터) ═══
   { id: 's_cu_khu', brand: 'CU', branch: '경희대점', category: 'convenience', mark: 'CU', color: '#7b2cbf', address: '경희대로4길 15', lat: 37.592493, lng: 127.053511 },
   { id: 's_gs_khumed', brand: 'GS25', branch: '경희의대점', category: 'convenience', mark: 'GS', color: '#0879c9', address: '회기로23가길 21', lat: 37.592324, lng: 127.054227 },
   { id: 's_seven_dorm', brand: '세븐일레븐', branch: '경희대기숙사점', category: 'convenience', mark: '7', color: '#e31e24', address: '이문로9길 46', lat: 37.594255, lng: 127.056536 },

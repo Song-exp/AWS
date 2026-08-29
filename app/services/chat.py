@@ -362,7 +362,7 @@ def note_upload(db: Session, session_id: str | None, user_id: uuid.UUID | None,
 
     msg = (
         f"'{filename}' 잘 받았어요. 본문 {text_len:,}자를 읽어서 보관했어요.\n"
-        "이 내용을 근거로 초안을 만들 수 있어요. 지원할 장학금 조건을 알려주시면 찾아드릴게요."
+        "이 내용을 근거로 초안을 만들 수 있어요."
     )
     sess.history.append(("bot", msg))
     return BotReply(

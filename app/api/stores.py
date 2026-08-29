@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.db import get_db
 from app.models.card import BenefitType, CardBenefit, Confidence
 from app.models.store import PayMethod, Store, StoreCategory, StoreOffer
+from app.models.local_benefit import LocalBenefitMerchant
 from app.services.card_normalize import store_brand_key
 
 router = APIRouter(prefix="/stores", tags=["stores"])
@@ -82,9 +83,44 @@ class StoreOut(BaseModel):
     offers: list[OfferOut] = []
     card_benefits: list[CardBenefitOut] = []
     distance_m: float | None = None
-    max_discount_rate: int = 0            # 간편결제 최대 할인율(기존 호환)
-    max_card_discount_rate: float = 0     # 카드 최대 정률 할인율
+    max_discount_rate: int = 0
+    max_card_discount_rate: float = 0
     best_deal: BestDeal | None = None
+
+
+class LocalBenefitOut(BaseModel):
+    id: int
+    source_key: str
+    merchant_name: str
+    category: StoreCategory
+    category_label: str | None = None
+    address: str | None = None
+    search_query: str
+    lat: float | None = None
+    lng: float | None = None
+    source_type: str
+    programs: list[str] = []
+    credentials: list[str] = []
+    requires: str | None = None
+    benefit_text: str
+    discount_type: str | None = None
+    discount_value: float | None = None
+    min_spend: float | None = None
+    max_amount: float | None = None
+    conditions: str | None = None
+    valid_to: date | None = None
+    confidence: str | None = None
+    source_url: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class LocalBenefitsPage(BaseModel):
+    items: list[LocalBenefitOut]
+    total: int
+    offset: int
+    limit: int
 
 
 def _active_offers(store: Store, pay: list[PayMethod] | None) -> list[StoreOffer]:
@@ -260,6 +296,49 @@ def nearby_stores(
         items.sort(key=lambda x: (x.distance_m is None, x.distance_m or 0))
 
     return items[:limit]
+
+
+@router.get("/local-benefits", response_model=LocalBenefitsPage)
+def local_benefits(
+    program: list[str] | None = Query(default=None, description="제휴/지역화폐 프로그램"),
+    credential: list[str] | None = Query(default=None, description="학생증/톡학생증 인증"),
+    category: list[StoreCategory] | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=100),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=60, ge=1, le=200),
+    db: Session = Depends(get_db),
+) -> LocalBenefitsPage:
+    """주소 기반 학생제휴·온누리·서울Pay+·제로페이 가맹점 조회."""
+    stmt = select(LocalBenefitMerchant).where(LocalBenefitMerchant.is_active.is_(True))
+    if category:
+        stmt = stmt.where(LocalBenefitMerchant.category.in_(category))
+    rows = db.scalars(stmt.order_by(LocalBenefitMerchant.id)).all()
+
+    requested_programs = set(program or [])
+    requested_credentials = set(credential or [])
+    query = q.strip().lower() if q else None
+    filtered: list[LocalBenefitMerchant] = []
+    for row in rows:
+        if requested_programs and not requested_programs.intersection(row.programs or []):
+            continue
+        required_credentials = set(row.credentials or [])
+        if required_credentials and not requested_credentials.intersection(required_credentials):
+            continue
+        if query:
+            haystack = " ".join(
+                value for value in (row.merchant_name, row.address, row.benefit_text) if value
+            ).lower()
+            if query not in haystack:
+                continue
+        filtered.append(row)
+
+    page = filtered[offset : offset + limit]
+    return LocalBenefitsPage(
+        items=[LocalBenefitOut.model_validate(row) for row in page],
+        total=len(filtered),
+        offset=offset,
+        limit=limit,
+    )
 
 
 @router.get("/{store_id}", response_model=StoreOut)

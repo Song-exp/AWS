@@ -35,6 +35,21 @@ _CATEGORY_LABELS = {
 
 # 통신사: 현재 혜택 데이터가 없어 선택용 정적 목록만 제공한다.
 _TELECOMS = ["SKT", "KT", "LG U+", "알뜰폰", "해당 없음"]
+_STUDENT_CREDENTIALS = [
+    ("student_card", "학생증"),
+    ("student_tok", "톡학생증"),
+]
+_BENEFIT_PROGRAMS = [
+    ("khu_alliance", "경희대 제휴혜택"),
+    ("onnuri", "온누리상품권"),
+    ("seoulpay", "서울Pay+"),
+    ("zeropay", "제로페이"),
+]
+
+
+class ProfileOption(BaseModel):
+    value: str
+    label: str
 
 
 class CardOption(BaseModel):
@@ -59,7 +74,9 @@ class OptionsOut(BaseModel):
     pay_methods: list[PayOption]
     categories: list[CategoryOption]
     telecoms: list[str]
-    telecom_supported: bool = False  # 통신사 혜택 데이터 보유 여부
+    telecom_supported: bool = False
+    student_credentials: list[ProfileOption]
+    benefit_programs: list[ProfileOption]
 
 
 @router.get("/options", response_model=OptionsOut)
@@ -90,4 +107,12 @@ def get_options(db: Session = Depends(get_db)) -> OptionsOut:
         ],
         telecoms=_TELECOMS,
         telecom_supported=False,
+        student_credentials=[
+            ProfileOption(value=value, label=label)
+            for value, label in _STUDENT_CREDENTIALS
+        ],
+        benefit_programs=[
+            ProfileOption(value=value, label=label)
+            for value, label in _BENEFIT_PROGRAMS
+        ],
     )

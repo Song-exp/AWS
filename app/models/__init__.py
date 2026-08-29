@@ -15,6 +15,7 @@ from app.models.card import (
     PeriodType,
 )
 from app.models.user import User
+from app.models.local_benefit import LocalBenefitMerchant
 
 __all__ = [
     # 장학금 챗봇
@@ -35,6 +36,7 @@ __all__ = [
     "BenefitType",
     "Confidence",
     "PeriodType",
+    "LocalBenefitMerchant",
     # 공통
     "User",
 ]

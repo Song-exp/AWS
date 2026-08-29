@@ -1,6 +1,8 @@
 import type {
   ChatRequest,
   ChatResponse,
+  LocalBenefitParams,
+  LocalBenefitsPage,
   MetaOptions,
   MyPageData,
   NearbyParams,
@@ -88,4 +90,22 @@ export async function fetchMyPage(
     throw new Error(`마이페이지 조회 실패: ${res.status}`);
   }
   return (await res.json()) as MyPageData;
+}
+
+
+export async function fetchLocalBenefits(
+  params: LocalBenefitParams
+): Promise<LocalBenefitsPage> {
+  const q = new URLSearchParams();
+  params.programs?.forEach((value) => q.append("program", value));
+  params.credentials?.forEach((value) => q.append("credential", value));
+  params.category?.forEach((value) => q.append("category", value));
+  if (params.q) q.set("q", params.q);
+  if (params.offset !== undefined) q.set("offset", String(params.offset));
+  if (params.limit !== undefined) q.set("limit", String(params.limit));
+  const res = await fetch(`${API_BASE}/stores/local-benefits?${q.toString()}`);
+  if (!res.ok) {
+    throw new Error(`제휴·지역화폐 조회 실패: ${res.status}`);
+  }
+  return (await res.json()) as LocalBenefitsPage;
 }

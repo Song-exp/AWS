@@ -128,7 +128,7 @@ export default function ChatPage({ userId }: Props) {
         <header className="chat-panel-head">
           <div className="assistant-avatar" aria-hidden="true">P</div>
           <div>
-            <strong>PayPick 장학 도우미</strong>
+            <strong>TMI 장학 도우미</strong>
             <span><i /> 상담 가능 · 공고 데이터 기반</span>
           </div>
           <span className="chat-security">근거 중심 답변</span>
