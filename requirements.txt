@@ -1,0 +1,42 @@
+# 이 프로젝트는 Python 3.14 venv에서 검증되었습니다.
+# scrapy/playwright 등 일부 패키지는 소스 빌드가 필요할 수 있으므로,
+# 프리빌트 휠만 사용하려면 다음처럼 설치하세요:
+#   pip install --only-binary=:all: -r requirements.txt
+
+# --- Web framework ---
+fastapi==0.115.6
+starlette==0.41.3
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
+
+# --- Data / ORM ---
+sqlalchemy==2.0.52
+psycopg[binary]==3.3.4
+pgvector==0.5.0
+alembic==1.19.1
+pydantic==2.13.4
+pydantic-settings==2.15.0
+
+# --- Crawling (실제 셀렉터 구현 단계에서 사용; 현재는 스텁) ---
+scrapy==2.18.0
+playwright==1.62.0
+httpx==0.28.1
+beautifulsoup4==4.12.3
+lxml==6.1.2
+
+# --- Scheduling (월간 크롤 파이프라인) ---
+APScheduler==3.11.0
+
+# --- File parsing (upload -> text) ---
+pypdf==5.1.0
+python-docx==1.1.2
+# NOTE: HWP 파싱은 순수 파이썬 지원이 제한적이라 olefile 기반 텍스트 추출을 사용.
+olefile==0.47
+
+# --- LLM (DeepSeek: OpenAI 호환. 실제 키는 .env) ---
+openai==3.5.0
+tiktoken==0.14.0
+
+# --- Utils ---
+python-dateutil==2.9.0.post0
+tenacity==9.0.0

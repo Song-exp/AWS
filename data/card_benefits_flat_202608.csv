@@ -1,0 +1,50 @@
+﻿card,merchant,category,benefit_type,benefit_value,benefit_text,min_payment,period_type,period,confidence
+KB국민 나라사랑체크카드,스타벅스,카페,percent,20,20% 할인,,always_on,상시,confirmed
+KB국민 나라사랑체크카드,아웃백,음식점,percent,20,20% 할인,,always_on,상시,confirmed
+KB국민 나라사랑체크카드,VIPS,음식점,percent,20,20% 할인,,always_on,상시,confirmed
+KB국민 나라사랑체크카드,PX(군마트),편의점,percent,5~20,5~20% 할인,,always_on,상시,confirmed
+KB국민 나라사랑체크카드,GS25 해군마트,편의점,percent,5~20,5~20% 할인,,always_on,상시,confirmed
+KB국민 나라사랑체크카드,GS25 / GS더프레시,편의점,event,,POP 행사(품목별 상이),,always_on,상시,confirmed
+KB국민 나라사랑체크카드,뚜레쥬르,베이커리,expired,,혜택 종료(2025-12-31),,always_on,종료,confirmed
+KB국민 나라사랑체크카드,세븐일레븐/로손/패밀리마트(일본),편의점(해외),amount,500,"건당 1,000엔↑ 시 500엔 외화머니(최대 5,000엔)","1,000엔",monthly_aug,2026-07-01~08-31,unverified
+KB국민 펭수 노리 체크카드,아웃백,음식점,percent,20,20% 할인,,always_on,상시,confirmed
+KB국민 펭수 노리 체크카드,VIPS,음식점,percent,20,20% 할인,,always_on,상시,confirmed
+KB국민 펭수 노리 체크카드,스타벅스,카페,percent,20,20% 할인,,always_on,상시,confirmed
+KB국민 펭수 노리 체크카드,GS25,편의점,percent,5,5% 할인,,always_on,상시,confirmed
+KB국민 펭수 노리 체크카드,세븐일레븐/로손/패밀리마트(일본),편의점(해외),amount,500,"건당 1,000엔↑ 시 500엔 외화머니(최대 5,000엔)","1,000엔",monthly_aug,2026-07-01~08-31,unverified
+네이버페이 머니 하나 체크카드,(미확인),-,unverified,,공식 활성 목록·설명서에서 상시 수치 미확정. 비공식 0.6%·1.2%는 배제,,always_on,-,unverified
+하나 나라사랑카드(체크),PX(군마트),편의점,percent,20~30,20~30% 할인,,always_on,상시,confirmed
+하나 나라사랑카드(체크),CU,편의점,percent,10~30,"행사품목 10%, 특정 기념일 30%",,always_on,상시,confirmed
+하나 나라사랑카드(체크),아웃백,음식점,percent,20,20% 할인,,always_on,상시,confirmed
+하나 나라사랑카드(체크),VIPS,음식점,percent,20,20% 할인,,always_on,상시,confirmed
+하나 나라사랑카드(체크),스타벅스,카페,percent,20,20% 할인,,always_on,상시,confirmed
+하나 나라사랑카드(체크),패스트푸드,음식점,percent,5,5% 할인,,always_on,상시,confirmed
+하나 나라사랑카드(체크),GS25,편의점,amount,2000,"데이지 에일 4캔 6,000원(캔당 500원↓)",,monthly_aug,2026-08-01~08-31,confirmed
+하나 나라사랑카드(체크),GS25,편의점,amount,6000,"맥주 9종 6캔 12,000원(캔당 1,000원↓)",,monthly_aug,2026-08-01~08-31,confirmed
+하나 나라사랑카드(체크),이마트24,편의점,percent,20,복날 연관상품 20% 즉시할인,,monthly_aug,2026-08-01~08-15,confirmed
+하나 나라사랑카드(체크),이마트24,편의점,percent,10,하겐다즈 2개↑ 10% 추가할인,,monthly_aug,2026-08-01~08-31,confirmed
+하나 나라사랑카드(체크),이마트24,편의점,percent,40,환타제로 2종 1박스(24개) 40% 즉시할인,,monthly_aug,2026-08-01~08-31,confirmed
+하나 나라사랑카드(체크),CU,편의점,percent,30,짐빔 하이볼 4종 4캔↑ 30% 즉시할인,,monthly_aug,2026-08-01~08-31,confirmed
+하나 나라사랑카드(체크),CU,편의점,percent,30,치트키 컵라면 12입 1박스 30% 즉시할인,,monthly_aug,2026-08-01~08-31,confirmed
+하나 나라사랑카드(체크),CU,편의점,percent,20,장보기특화점 과일·채소·두부·생란·정육 20% 즉시할인,,monthly_aug,2026-08-01~08-31,confirmed
+하나 나라사랑카드(체크),CU,편의점,percent,20,쟁여위크 대상상품 20% 즉시할인,,monthly_aug,2026-08-15~08-31,confirmed
+하나 나라사랑카드(체크),이마트/하나로마트/롯데마트/GS THE FRESH,마트,percent,50,추석 선물세트 최대 50% 즉시할인,,monthly_aug,2026-08-06~09-25,confirmed
+하나 나라사랑카드(체크),세븐일레븐,편의점,amount,3000,"5,000원↑ 결제 시 3,000원 쿠폰할인",5000,week4_aug,2026-08-21~08-31,confirmed
+하나 나라사랑카드(체크),메가MGC커피,카페,amount,1000,"5,000원↑ 결제 시 1,000원 청구할인",5000,week4_aug,2026-08-20~08-31,confirmed
+하나 나라사랑카드(체크),파리바게뜨,베이커리,amount,2000,"10,000원↑ 결제 시 2,000원 청구할인",10000,week4_aug,2026-08-21~08-31,confirmed
+하나 나라사랑카드(체크),GS25,편의점,percent,20,우리동네GS앱 와인25+ 20% 즉시할인,,week4_aug,2026-08-20~08-26,confirmed
+IBK 참! 좋은 EASY 캐시백 체크카드,국내외 전 가맹점,전업종,cashback,0.2,0.2% 캐시백,,always_on,상시,confirmed
+IBK 참! 좋은 EASY 캐시백 체크카드,음식점 등(점심·저녁 특정 시간),음식점,cashback,0.6,특정 시간 총 0.6% 캐시백,,always_on,상시,confirmed
+IBK 참! 좋은 EASY 캐시백 체크카드,포천힐스CC 주변맛집,음식점,amount,5000,"10,000원↑ 결제 시 5,000원 결제일할인",10000,week4_aug,2026-08-24~09-14,unverified
+IBK 참! 좋은 EASY 캐시백 체크카드,소피텔 서울 식음업장,음식점,percent,40,QR결제 시 40% 할인,,monthly_aug,2026-08-11~09-30,unverified
+KB국민(나라사랑·펭수 노리),데일리샷,주류앱(오프라인 제휴매장),amount,4000,"최대 4,000원 즉시할인",,monthly_aug,2026-08-01~08-31,conditional
+KB국민(나라사랑·펭수 노리),GS25,편의점,event,,GS25 드링KING 페스타(품목별 즉시할인),,monthly_aug,2026-08-01~08-31,conditional
+KB국민(나라사랑·펭수 노리),GS25,편의점,event,,추석 사전 구매 행사(품목별 즉시할인),,monthly_aug,2026-08-17~09-04,conditional
+KB국민(나라사랑·펭수 노리),홈플러스 익스프레스,마트(오프라인),event,,행사상품 즉시할인,,week4_aug,2026-08-20~08-31,conditional
+KB국민(나라사랑·펭수 노리),이마트,마트(오프라인),event,,즉시할인 및 상품권 증정,,monthly_aug,2026-07-30~08-31,conditional
+KB국민(나라사랑·펭수 노리),이마트 에브리데이,마트(오프라인),event,,행사상품 즉시할인,,monthly_aug,2026-07-30~08-31,conditional
+KB국민(나라사랑·펭수 노리),홈플러스,마트(오프라인),event,,행사상품 즉시할인,,week4_aug,2026-08-27~09-02,conditional
+KB국민(나라사랑·펭수 노리),농협 하나로마트,마트(오프라인),amount,5000,"최대 5,000원 즉시할인",,week4_aug,2026-08-27~08-30,conditional
+KB국민(나라사랑·펭수 노리),롯데슈퍼,마트(오프라인),event,,행사상품 즉시할인,,week4_aug,2026-08-20~09-09,conditional
+KB국민(나라사랑·펭수 노리),컬리,식품몰(온라인),percent,20,"최대 20% 할인(또는 최대 12,000원 즉시할인)",,monthly_aug,2026-08-01~08-31,conditional
+KB국민(나라사랑·펭수 노리),올리브영,H&B(오프라인),amount,3000,"3,000원 청구할인",,monthly_aug,2026-08-30~09-05,conditional

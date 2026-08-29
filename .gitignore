@@ -1,5 +1,34 @@
+# Node / Frontend
 node_modules/
-.DS_Store
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Data / uploads
+/data/uploads/
+/data/*.db
+
+# IDE & OS
 .vscode/
+.idea/
+.DS_Store
+Thumbs.db
+~$*
+
+# Misc
 download.jpg
 config.js

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="내 결제수단으로 가장 유리한 할인을 찾아주는 앱.">
+  <title>페이픽 | 내 결제수단 최적 할인</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- ═══ 1단계: 카드·혜택수단 선택 화면 ═══ -->
+  <div id="onboarding" class="onboarding" aria-labelledby="methodPageTitle">
+    <div class="onboarding-inner">
+      <nav class="page-steps" aria-label="시연 단계">
+        <span class="page-step is-active"><b>1</b> 카드·수단 선택</span>
+        <span class="page-step"><b>2</b> 할인 지도</span>
+      </nav>
+      <div class="onboarding-head">
+        <p class="eyebrow">PAYMENT SETUP</p>
+        <h1 id="methodPageTitle">보유 카드와<br><strong>혜택 수단</strong>을 선택하세요</h1>
+        <p class="onboarding-sub">제휴, 카카오톡 톡학생증, 통신사, 페이와 카드를 구분해 선택합니다.</p>
+      </div>
+      <div id="onboardingGroups" class="onboarding-groups"></div>
+    </div>
+    <div class="onboarding-footer">
+      <button id="onboardingSubmit" class="primary-button wide" type="button">선택 완료 · 할인 지도 보기</button>
+    </div>
+  </div>
+
+  <!-- ═══ 2단계: 할인 지도 화면 ═══ -->
+  <div id="appMain" hidden>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="페이픽 홈"><span>Pay</span>Pick</a>
+      <div class="topbar-actions">
+        <!-- 사용자 드롭다운: 정현 아이디어 -->
+        <label class="demo-user-control">
+          <span>시연 사용자</span>
+          <select id="demoUserSelect" aria-label="시연 사용자 선택"></select>
+        </label>
+        <span id="demoUserSummary" class="demo-user-summary"></span>
+        <button id="editMethodsButton" class="location-button" type="button">보유수단 변경</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="pageTitle">
+        <nav class="page-steps compact" aria-label="시연 단계">
+          <span class="page-step"><b>1</b> 카드·수단 선택</span>
+          <span class="page-step is-active"><b>2</b> 할인 지도</span>
+        </nav>
+        <p class="eyebrow">PERSONAL BENEFIT MAP</p>
+        <h1 id="pageTitle">내 수단으로 가장 유리한<br><strong>할인</strong>을 한눈에.</h1>
+        <p id="locationStatus" class="location-status" aria-live="polite">사용자를 바꾸면 보유 카드와 혜택 추천이 즉시 달라집니다.</p>
+      </section>
+
+      <section class="filters" aria-labelledby="filterTitle">
+        <div class="section-heading">
+          <h2 id="filterTitle">업종</h2>
+          <button id="myMethodsChip" class="text-button" type="button">내 수단 0개</button>
+        </div>
+        <div id="categoryFilters" class="pay-filters" role="group" aria-label="업종 필터"></div>
+      </section>
+
+      <section class="filters" aria-labelledby="methodFilterTitle">
+        <div class="section-heading">
+          <h2 id="methodFilterTitle">내 결제수단</h2>
+          <button id="methodAllButton" class="text-button" type="button">전체 켜기</button>
+        </div>
+        <div id="methodFilters" class="pay-filters" role="group" aria-label="결제수단 필터"></div>
+      </section>
+
+      <section class="results" aria-labelledby="resultTitle">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">NEARBY BENEFITS</p>
+            <h2 id="resultTitle">주변 혜택 <span id="resultCount">0</span></h2>
+          </div>
+          <div class="result-actions">
+            <div class="view-toggle" role="group" aria-label="보기 방식">
+              <button class="view-button" type="button" data-view="map" aria-pressed="true">지도</button>
+              <button class="view-button" type="button" data-view="list" aria-pressed="false">리스트</button>
+            </div>
+            <label class="sort-label">정렬
+              <select id="sortSelect">
+                <option value="distance">가까운 순</option>
+                <option value="discount">할인 높은 순</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div id="mapView" class="map-view">
+          <div class="map-search">경희대 · 회기역 · 외대앞 할인 지도</div>
+          <button id="recenterButton" class="map-recenter" type="button" aria-label="전체 서비스 영역 보기">전체 보기</button>
+          <div class="category-legend" aria-label="업종 색상 안내">
+            <span data-category="restaurant">음식점</span>
+            <span data-category="cafe">카페</span>
+            <span data-category="convenience">편의점</span>
+          </div>
+          <div id="map" aria-label="경희대학교 주변 할인 지도"></div>
+          <aside id="mapStoreCard" class="map-store-card" aria-live="polite" hidden></aside>
+        </div>
+        <div id="benefitList" class="benefit-list" hidden></div>
+        <div id="emptyState" class="empty-state" hidden>
+          <p>내 결제수단으로 받을 수 있는 혜택이 없어요.</p>
+          <button type="button" class="primary-button">보유수단 다시 선택</button>
+        </div>
+      </section>
+    </main>
+
+    <p class="notice">검증된 혜택만 추천 금액에 반영하며, 미검증 정보는 참고 항목으로 분리합니다.</p>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="data.js"></script>
+  <script src="engine.js"></script>
+  <script>
+    const kakaoMapScript = document.createElement('script');
+    kakaoMapScript.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${window.KAKAO_MAP_KEY || ''}&autoload=false&libraries=services`;
+    kakaoMapScript.onload = () => window.dispatchEvent(new Event('kakao-sdk-ready'));
+    document.head.append(kakaoMapScript);
+  </script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+{
+  "meta": {
+    "title": "5개 체크카드 오프라인 음식점·카페·편의점 혜택 총정리",
+    "as_of_date": "2026-08-28",
+    "scope": [
+      "상시 오프라인 음식점·카페·편의점 혜택(이전 조사)",
+      "2026년 8월 전체 월간 프로모션",
+      "2026년 8월 4주차(2026-08-20~08-31) 한정 프로모션"
+    ],
+    "confidence_levels": {
+      "confirmed": "공식 카드사·은행·페이북 페이지에서 대상카드·기간·혜택·조건을 직접 확인",
+      "conditional": "공식 확인되나 대상카드 해당 여부 등 일부 전제가 남음",
+      "unverified": "행사 존재는 확인되나 대상카드/조건이 앱·로그인 전용 등으로 정적 확인 불가"
+    },
+    "sources": {
+      "kb_events": "https://card.kbcard.com/BON/DVIEW/HBBMCXCRVNEC0001",
+      "hana_events": "https://m.hanacard.co.kr/MKEVT1000M.web",
+      "ibk_events": "https://www.ibk.co.kr/event/ingListEvent.ibk?pageId=CM01060100&evnt_dscd=H",
+      "paybooc_events": "https://web.paybooc.co.kr/web/evnt/main"
+    },
+    "notes": "상시혜택은 이전 응답 기준 요약이며, 8월 프로모션과 별개 항목. 각 카드의 상시 청구할인과 8월 청구할인 이벤트는 중복 배제(더 높은 쪽 적용)가 일반 원칙."
+  },
+  "cards": [
+    {
+      "card_id": "kb_narasarang_check",
+      "card_name": "KB국민 나라사랑체크카드",
+      "issuer": "KB국민카드",
+      "issuance_status": "2025-12-24 신규발급 종료",
+      "always_on_benefits": [
+        {"merchant": "스타벅스", "category": "카페", "benefit": "20% 할인", "note": "상시"},
+        {"merchant": "아웃백·VIPS", "category": "음식점", "benefit": "20% 할인", "note": "상시"},
+        {"merchant": "PX·GS25 해군마트", "category": "편의점", "benefit": "5~20%", "note": "상시"},
+        {"merchant": "GS25·GS더프레시", "category": "편의점", "benefit": "POP 행사", "note": "상시"},
+        {"merchant": "뚜레쥬르", "category": "베이커리", "benefit": "혜택 종료(2025-12-31)", "note": "종료"}
+      ],
+      "august_2026_monthly": [
+        {
+          "event_no": "1001429",
+          "title": "일본 3대 편의점 최대 50% 페이백",
+          "period": "2026-07-01 ~ 2026-08-31",
+          "target_card_text": "KB국민 개인 신용/체크 국내외겸용카드 (기업·비씨·마에스트로 제외)",
+          "merchants": ["세븐일레븐(일본)", "로손", "패밀리마트"],
+          "category": "편의점(해외)",
+          "benefit": "건당 1,000엔↑ 시 500엔 외화머니, 최대 5,000엔",
+          "min_payment": "건당 1,000엔(JPY)",
+          "cap": "최대 5,000엔(JPY)",
+          "conditions": ["사전 응모 필수", "해외 승인 건만 인정", "KB Pay 가입·외화머니 계정 필요", "간편결제 국내 이용 제외"],
+          "offline": true,
+          "stackable_with_always_on": "다른 행사와 중복 가능",
+          "confidence": "unverified",
+          "confidence_reason": "나라사랑체크는 국내전용 성격이 강해 '국내외겸용' 대상 여부를 공식 상품안내장에서 확인하지 못함",
+          "url": "https://card.kbcard.com/BON/DVIEW/HBBMCXCRVNEC0001?mainCC=a&eventNum=1001429"
+        }
+      ],
+      "august_2026_week4": [],
+      "unverified_or_excluded": [
+        {"title": "KB Pay 첫 만남 커피 쿠폰(1001598)", "reason": "신규가입 응모 조건, 오프라인 결제 혜택 아님 → 상시혜택 대체 부적합"}
+      ]
+    },
+    {
+      "card_id": "kb_pengsoo_nori_check",
+      "card_name": "KB국민 펭수 노리 체크카드",
+      "issuer": "KB국민카드",
+      "issuance_status": "발급 가능",
+      "always_on_benefits": [
+        {"merchant": "아웃백·VIPS", "category": "음식점", "benefit": "20% 할인", "note": "상시"},
+        {"merchant": "스타벅스", "category": "카페", "benefit": "20% 할인", "note": "상시"},
+        {"merchant": "GS25", "category": "편의점", "benefit": "5%", "note": "상시"}
+      ],
+      "august_2026_monthly": [
+        {
+          "event_no": "1001429",
+          "title": "일본 3대 편의점 최대 50% 페이백",
+          "period": "2026-07-01 ~ 2026-08-31",
+          "target_card_text": "KB국민 개인 신용/체크 국내외겸용카드 (기업·비씨·마에스트로 제외)",
+          "merchants": ["세븐일레븐(일본)", "로손", "패밀리마트"],
+          "category": "편의점(해외)",
+          "benefit": "건당 1,000엔↑ 시 500엔 외화머니, 최대 5,000엔",
+          "conditions": ["사전 응모 필수", "해외 승인 건만 인정", "KB Pay 가입·외화머니 계정 필요"],
+          "offline": true,
+          "confidence": "unverified",
+          "confidence_reason": "펭수 노리 체크의 해외겸용 브랜드 여부를 공식 자료에서 확인하지 못함",
+          "url": "https://card.kbcard.com/BON/DVIEW/HBBMCXCRVNEC0001?mainCC=a&eventNum=1001429"
+        }
+      ],
+      "august_2026_week4": [],
+      "unverified_or_excluded": []
+    },
+    {
+      "card_id": "npay_money_hana_check",
+      "card_name": "네이버페이 머니 하나 체크카드",
+      "issuer": "하나카드",
+      "issuance_status": "발급 가능",
+      "always_on_benefits": [
+        {"note": "공식 활성 목록·공개 설명서에서 상시 수치 미확정. 비공식 0.6%·1.2%는 확정값에서 배제", "confidence": "unverified"}
+      ],
+      "august_2026_monthly": [],
+      "august_2026_week4": [],
+      "unverified_or_excluded": [
+        {"title": "8월 오프라인 음식점·카페·편의점 전용 행사", "reason": "네이버페이·하나 공식 활성 목록에서 이 카드 전용 8월 오프라인 식음료·편의점 행사를 확인하지 못함", "confidence": "unverified"}
+      ]
+    },
+    {
+      "card_id": "hana_narasarang_check",
+      "card_name": "하나 나라사랑카드(체크)",
+      "issuer": "하나카드",
+      "issuance_status": "발급 가능",
+      "always_on_benefits": [
+        {"merchant": "PX", "category": "편의점", "benefit": "20~30%", "note": "상시"},
+        {"merchant": "CU", "category": "편의점", "benefit": "행사품목 10%, 특정 기념일 30%", "note": "상시"},
+        {"merchant": "아웃백·VIPS", "category": "음식점", "benefit": "20% 할인", "note": "상시"},
+        {"merchant": "스타벅스", "category": "카페", "benefit": "20% 할인", "note": "상시"},
+        {"merchant": "패스트푸드", "category": "음식점", "benefit": "5%", "note": "상시"}
+      ],
+      "august_2026_monthly": [
+        {
+          "event_no": "60483",
+          "title": "8월 대형마트·편의점 혜택",
+          "period": "2026-08-01 ~ 2026-08-31",
+          "target_card_text": "하나 개인 신용/체크카드 (하나BC·법인·선불·기프트·토스·카카오페이머니카드 제외)",
+          "target_includes_this_card": true,
+          "merchants": [
+            {"name": "GS25", "benefits": ["데이지 에일 4캔 6,000원", "맥주 9종 6캔 12,000원(8/1~8/31)", "와인25+ 20%(8/20~8/26, 우리동네GS앱)"]},
+            {"name": "이마트24", "benefits": ["복날상품 20%(8/1~8/15)", "하겐다즈 2개+ 10% 추가", "환타제로 1박스 40%(8/1~8/31)"]},
+            {"name": "CU", "benefits": ["짐빔 하이볼 4캔+ 30%", "치트키 컵라면 1박스 30%", "장보기특화점 신선식품 20%", "쟁여위크 20%(8/15~8/31)"]},
+            {"name": "이마트/하나로마트/롯데마트/GS THE FRESH", "benefits": ["추석 선물세트 최대 50% 즉시할인(8/6~9/25)"]}
+          ],
+          "category": ["편의점", "마트"],
+          "min_payment": "품목별 즉시할인(일반 최소금액 없음)",
+          "cap": "대부분 1일 1인 1회",
+          "conditions": ["CU 짐빔·컵라면은 포켓CU앱 멤버십 QR + 하나카드 결제", "간편결제(카카오페이·페이코 등) 제외"],
+          "offline": true,
+          "stackable_with_always_on": "제휴할인/쿠폰 등 타 혜택과 중복 불가할 수 있음. 청구할인은 카드 자체 청구할인과 더 높은 쪽만 적용",
+          "confidence": "confirmed",
+          "compliance": "준법심의 A-26-2960",
+          "url": "https://m.hanacard.co.kr/MKEVT1010M.web?EVN_SEQ=60483"
+        }
+      ],
+      "august_2026_week4": [
+        {
+          "event_no": "60512",
+          "title": "Last 10 Days (8월 20일부터 강력한 할인 혜택)",
+          "period": "2026-08-20 ~ 2026-08-31",
+          "target_card_text": "하나 개인 신용/체크카드 (하나BC 제외)",
+          "target_includes_this_card": true,
+          "merchants": [
+            {"name": "세븐일레븐", "category": "편의점", "benefit": "하나Pick 신청 후 5,000원↑ 3,000원 쿠폰할인", "period": "8/21~8/31", "limit": "선착순 3,000명"},
+            {"name": "메가MGC커피", "category": "카페", "benefit": "하나Pick 신청 후 5,000원↑ 1,000원 청구할인", "period": "8/20~8/31"},
+            {"name": "파리바게뜨", "category": "베이커리", "benefit": "하나Pick 신청 후 10,000원↑ 2,000원 청구할인", "period": "8/21~8/31"},
+            {"name": "GS25", "category": "편의점", "benefit": "우리동네GS앱 와인25+ 20% 즉시할인", "period": "8/20~8/26", "note": "간편결제 제외"}
+          ],
+          "min_payment": "세븐일레븐 5,000원 / 메가커피 5,000원 / 파리바게뜨 10,000원",
+          "conditions": ["세븐일레븐·메가커피·파리바게뜨는 하나Pick 사전 신청 필수", "체크카드는 매출접수 2영업일 뒤 결제계좌로 청구할인 캐시백"],
+          "offline": true,
+          "stackable_with_always_on": "청구할인은 카드 자체 청구할인·타 이벤트와 중복 배제(더 높은 쪽 적용)",
+          "confidence": "confirmed",
+          "compliance": "준법심의 A-26-3165",
+          "url": "https://m.hanacard.co.kr/MKEVT1010M.web?EVN_SEQ=60512"
+        }
+      ],
+      "unverified_or_excluded": []
+    },
+    {
+      "card_id": "ibk_easy_cashback_check",
+      "card_name": "IBK 참! 좋은 EASY 캐시백 체크카드",
+      "issuer": "IBK기업은행(BC 발급망)",
+      "issuance_status": "발급 가능",
+      "always_on_benefits": [
+        {"merchant": "국내외 전 가맹점", "category": "전업종", "benefit": "0.2% 캐시백", "note": "상시"},
+        {"merchant": "점심·저녁 특정 시간", "category": "음식점 등", "benefit": "총 0.6% (전월 30만원 조건)", "note": "상시"}
+      ],
+      "august_2026_monthly": [],
+      "august_2026_week4": [],
+      "unverified_or_excluded": [
+        {"event_no": "2026080019", "title": "포천힐스CC 주변맛집 할인", "period": "2026-08-24 ~ 2026-09-14", "benefit": "1만원↑ 결제 시 5천원 결제일할인", "channel": "페이북", "confidence": "unverified", "reason": "IBK EASY 체크카드 포함 여부가 앱·로그인 전용 SPA로만 제공되어 정적 확인 불가", "note": "8월 4주차 개시 행사"},
+        {"event_no": "2026080007", "title": "소피텔 서울 식음업장 QR결제 40% 할인", "period": "2026-08-11 ~ 2026-09-30", "channel": "페이북", "confidence": "unverified", "reason": "대상 카드 정적 확인 불가"},
+        {"event_no": "2026080004", "title": "쿠팡·네이버페이 등 8월 마이태그 혜택", "period": "2026-08-05 ~ 2026-08-31", "channel": "페이북", "confidence": "unverified", "reason": "대상 카드·오프라인 여부 정적 확인 불가"},
+        {"event_no": "2026080018", "title": "GS25 x IM뱅크 x 광주은행 GSPay 첫 결제 쿠폰", "period": "2026-08-19 ~ 2026-08-31", "channel": "페이북", "confidence": "excluded", "reason": "제목상 광주은행·IM뱅크 전용, IBK 대상 아님"}
+      ]
+    }
+  ]
+}
