@@ -9,35 +9,49 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- ═══ 온보딩 화면 ═══ -->
-  <div id="onboarding" class="onboarding">
+  <!-- ═══ 1단계: 카드·혜택수단 선택 화면 ═══ -->
+  <div id="onboarding" class="onboarding" aria-labelledby="methodPageTitle">
     <div class="onboarding-inner">
+      <nav class="page-steps" aria-label="시연 단계">
+        <span class="page-step is-active"><b>1</b> 카드·수단 선택</span>
+        <span class="page-step"><b>2</b> 할인 지도</span>
+      </nav>
       <div class="onboarding-head">
-        <p class="eyebrow">STEP 1</p>
-        <h1>가지고 있는<br><strong>결제수단</strong>을 골라주세요</h1>
-        <p class="onboarding-sub">선택한 수단 기준으로 가장 유리한 할인만 보여드려요.</p>
+        <p class="eyebrow">PAYMENT SETUP</p>
+        <h1 id="methodPageTitle">보유 카드와<br><strong>혜택 수단</strong>을 선택하세요</h1>
+        <p class="onboarding-sub">제휴, 카카오톡 톡학생증, 통신사, 페이와 카드를 구분해 선택합니다.</p>
       </div>
       <div id="onboardingGroups" class="onboarding-groups"></div>
     </div>
     <div class="onboarding-footer">
-      <button id="onboardingSubmit" class="primary-button wide" type="button">선택하고 시작하기</button>
+      <button id="onboardingSubmit" class="primary-button wide" type="button">선택 완료 · 할인 지도 보기</button>
     </div>
   </div>
 
-  <!-- ═══ 메인 화면 ═══ -->
+  <!-- ═══ 2단계: 할인 지도 화면 ═══ -->
   <div id="appMain" hidden>
     <header class="topbar">
       <a class="brand" href="#" aria-label="페이픽 홈"><span>Pay</span>Pick</a>
-      <button id="editMethodsButton" class="location-button" type="button">
-        <span aria-hidden="true">⚙</span> 결제수단 변경
-      </button>
+      <div class="topbar-actions">
+        <!-- 사용자 드롭다운: 정현 아이디어 -->
+        <label class="demo-user-control">
+          <span>시연 사용자</span>
+          <select id="demoUserSelect" aria-label="시연 사용자 선택"></select>
+        </label>
+        <span id="demoUserSummary" class="demo-user-summary"></span>
+        <button id="editMethodsButton" class="location-button" type="button">보유수단 변경</button>
+      </div>
     </header>
 
     <main>
       <section class="hero" aria-labelledby="pageTitle">
-        <p class="eyebrow">오늘 어디서 결제할까요?</p>
+        <nav class="page-steps compact" aria-label="시연 단계">
+          <span class="page-step"><b>1</b> 카드·수단 선택</span>
+          <span class="page-step is-active"><b>2</b> 할인 지도</span>
+        </nav>
+        <p class="eyebrow">PERSONAL BENEFIT MAP</p>
         <h1 id="pageTitle">내 수단으로 가장 유리한<br><strong>할인</strong>을 한눈에.</h1>
-        <p id="locationStatus" class="location-status" aria-live="polite">경희대·회기역·외대앞 일대 데모 혜택을 보여드려요.</p>
+        <p id="locationStatus" class="location-status" aria-live="polite">사용자를 바꾸면 보유 카드와 혜택 추천이 즉시 달라집니다.</p>
       </section>
 
       <section class="filters" aria-labelledby="filterTitle">
@@ -76,20 +90,25 @@
           </div>
         </div>
         <div id="mapView" class="map-view">
-          <div class="map-search" aria-hidden="true"><span>⌕</span> 경희대 · 회기역 · 외대앞</div>
-          <button id="recenterButton" class="map-recenter" type="button" aria-label="전체 서비스 영역 보기">◎</button>
+          <div class="map-search">경희대 · 회기역 · 외대앞 할인 지도</div>
+          <button id="recenterButton" class="map-recenter" type="button" aria-label="전체 서비스 영역 보기">전체 보기</button>
+          <div class="category-legend" aria-label="업종 색상 안내">
+            <span data-category="restaurant">음식점</span>
+            <span data-category="cafe">카페</span>
+            <span data-category="convenience">편의점</span>
+          </div>
           <div id="map" aria-label="경희대학교 주변 할인 지도"></div>
           <aside id="mapStoreCard" class="map-store-card" aria-live="polite" hidden></aside>
         </div>
         <div id="benefitList" class="benefit-list" hidden></div>
         <div id="emptyState" class="empty-state" hidden>
           <p>내 결제수단으로 받을 수 있는 혜택이 없어요.</p>
-          <button type="button" class="primary-button">결제수단 다시 고르기</button>
+          <button type="button" class="primary-button">보유수단 다시 선택</button>
         </div>
       </section>
     </main>
 
-    <p class="notice">현재 표시된 혜택은 MVP용 예시 데이터이며 실제 매장 프로모션과 다를 수 있어요. (2026-08 기준)</p>
+    <p class="notice">검증된 혜택만 추천 금액에 반영하며, 미검증 정보는 참고 항목으로 분리합니다.</p>
   </div>
 
   <script src="config.js"></script>
