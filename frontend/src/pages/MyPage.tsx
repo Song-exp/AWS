@@ -117,6 +117,29 @@ export default function MyPage({ profile }: Props) {
           )
         )}
       </div>
+
+      <section className="scholarship-savings" aria-labelledby="scholarship-savings-title">
+        <p className="eyebrow">SCHOLARSHIP SAVINGS</p>
+        <h2 id="scholarship-savings-title">이제까지 아낀 장학금</h2>
+        <div className="character-walkway" aria-label="경희 남녀 캐릭터가 걷는 모습">
+          <div className="walking-pair">
+            <span className="walking-character">
+              <img
+                src="/khu-male-walk.gif"
+                alt="걷는 경희 남학생 캐릭터"
+                loading="lazy"
+              />
+            </span>
+            <span className="walking-character">
+              <img
+                src="/khu-female-walk.gif"
+                alt="걷는 경희 여학생 캐릭터"
+                loading="lazy"
+              />
+            </span>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

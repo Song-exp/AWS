@@ -8,14 +8,36 @@ import type { UserProfileLocal } from "./types";
 type Tab = "map" | "chat" | "my";
 
 const STORAGE_KEY = "paypick.profile.v1";
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value);
+}
 
 function loadProfile(): UserProfileLocal | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const p = JSON.parse(raw) as UserProfileLocal;
-    if (!Array.isArray(p.cardIds) || !Array.isArray(p.payMethods)) return null;
-    return p;
+
+    const stored = JSON.parse(raw) as Partial<UserProfileLocal>;
+    if (!Array.isArray(stored.cardIds) || !Array.isArray(stored.payMethods)) {
+      return null;
+    }
+
+    // userId 도입 전에 저장된 프로필도 같은 키를 사용한다. UUID가 없거나
+    // 잘못된 경우 여기서 한 번 생성해 채팅 저장과 마이페이지 조회가 공유한다.
+    const profile: UserProfileLocal = {
+      userId: isUuid(stored.userId) ? stored.userId : crypto.randomUUID(),
+      cardIds: stored.cardIds.filter(
+        (id): id is number => typeof id === "number" && Number.isInteger(id)
+      ),
+      telecom: typeof stored.telecom === "string" ? stored.telecom : null,
+      payMethods: stored.payMethods,
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    return profile;
   } catch {
     return null;
   }
@@ -26,7 +48,6 @@ export default function App() {
   const [onboarding, setOnboarding] = useState(true);
   const [tab, setTab] = useState<Tab>("map");
 
-  // 저장된 프로필이 있으면 온보딩을 건너뛴다.
   useEffect(() => {
     const saved = loadProfile();
     if (saved) {
@@ -35,9 +56,15 @@ export default function App() {
     }
   }, []);
 
-  function handleComplete(p: UserProfileLocal) {
-    setProfile(p);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  function handleComplete(nextProfile: UserProfileLocal) {
+    const normalized = {
+      ...nextProfile,
+      userId: isUuid(nextProfile.userId)
+        ? nextProfile.userId
+        : crypto.randomUUID(),
+    };
+    setProfile(normalized);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
     setOnboarding(false);
     setTab("map");
   }
@@ -77,7 +104,7 @@ export default function App() {
         {tab === "map" ? (
           <MapPage profile={profile} />
         ) : tab === "chat" ? (
-          <ChatPage />
+          <ChatPage userId={profile?.userId ?? null} />
         ) : (
           <MyPage profile={profile} />
         )}

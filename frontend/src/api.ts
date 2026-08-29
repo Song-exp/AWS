@@ -33,11 +33,13 @@ export async function fetchOptions(): Promise<MetaOptions> {
 /** 대화 중 과거 신청서(PDF 등)를 첨부한다. */
 export async function uploadChatFile(
   file: File,
-  sessionId: string | null
+  sessionId: string | null,
+  userId: string | null
 ): Promise<ChatResponse> {
   const form = new FormData();
   form.append("file", file);
   if (sessionId) form.append("session_id", sessionId);
+  if (userId) form.append("user_id", userId);
 
   const res = await fetch(`${API_BASE}/chat/upload`, {
     method: "POST",
