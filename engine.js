@@ -86,6 +86,7 @@ function benefitSaving(benefit, spend, opts = {}) {
 
 // 혜택 표시 문구
 function benefitLabel(benefit) {
+  if (benefit.displayLabel) return benefit.displayLabel
   switch (benefit.type) {
     case 'percent': return `${benefit.value}% 할인`
     case 'fixed': return `${benefit.value.toLocaleString()}원 할인`

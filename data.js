@@ -32,7 +32,7 @@ const PAYMENT_GROUPS = [
     methods: [
       { id: 'pay_kakao', name: '카카오페이', issuer: '카카오' },
       { id: 'pay_naver', name: '네이버페이', issuer: '네이버' },
-      { id: 'pay_danggeun', name: '당근페이', issuer: '당근' },
+      { id: 'pay_toss', name: '토스페이', issuer: '토스' },
     ],
   },
   {
@@ -45,6 +45,7 @@ const PAYMENT_GROUPS = [
       { id: 'hana_naverpay', name: '네이버페이머니', issuer: '하나' },
       { id: 'hana_narasarang', name: '나라사랑카드', issuer: '하나' },
       { id: 'ibk_easy_cashback', name: 'EASY Cashback', issuer: '기업' },
+      { id: 'hyundai_oliveyoung_plus', name: '올리브영 현대카드 Plus', issuer: '현대' },
     ],
   },
   {
@@ -58,22 +59,32 @@ const PAYMENT_GROUPS = [
   },
 ]
 
-// 발표 시연용 사용자. 두 사용자의 카드·통신사·페이를 다르게 구성해
-// 드롭다운 전환 시 지도 추천이 즉시 달라지는 것을 보여준다.
+// 발표 시연용 가상 사용자. 보유수단과 소비 성향을 함께 바꿔
+// 사용자 전환 시 추천 매장과 순위가 즉시 달라지는 것을 보여준다.
 const DEMO_USERS = [
   {
     id: 'demo_a',
-    name: '사용자 A',
+    name: '민지 · 카페·문화형',
     cardLabel: 'KB 펭수 노리 카드',
-    owned: ['khu_alliance', 'student_tok', 'telecom_skt', 'pay_kakao', 'kb_pengsoo', 'local_onnuri'],
-    profile: { naverPlus: false, kakaoPlus: true, telecomGrade: 'vip', gradeLabel: 'VIP' },
+    owned: ['khu_alliance', 'student_tok', 'telecom_skt', 'pay_kakao', 'pay_naver', 'kb_pengsoo'],
+    preferences: ['cafe', 'culture', 'convenience'],
+    profile: { naverPlus: true, kakaoPlus: true, telecomGrade: 'vip', gradeLabel: 'VIP' },
   },
   {
     id: 'demo_b',
-    name: '사용자 B',
+    name: '준호 · 학교생활형',
     cardLabel: '하나 네이버페이머니',
     owned: ['khu_alliance', 'student_card', 'telecom_kt', 'pay_naver', 'hana_naverpay', 'local_seoul'],
+    preferences: ['campus', 'restaurant', 'lifestyle'],
     profile: { naverPlus: true, kakaoPlus: false, telecomGrade: 'normal', gradeLabel: 'Silver' },
+  },
+  {
+    id: 'demo_c',
+    name: '서연 · 생활절약형',
+    cardLabel: '올리브영 현대카드 Plus',
+    owned: ['student_card', 'telecom_lgu', 'pay_toss', 'hyundai_oliveyoung_plus', 'local_seoul', 'local_onnuri'],
+    preferences: ['lifestyle', 'convenience', 'restaurant'],
+    profile: { naverPlus: false, kakaoPlus: false, telecomGrade: 'vip', gradeLabel: 'Gold' },
   },
 ]
 
@@ -147,6 +158,19 @@ const STORES = [
   { id: 'khu_neoknok', brand: '', branch: '넉넉', category: 'restaurant', mark: '🍖', color: '#6c5ce7', address: '서울 동대문구 경희대로4길 22 1층 102호', lat: 37.5937, lng: 127.0517 },
   { id: 'khu_goheung', brand: '', branch: '고흥소곱창', category: 'restaurant', mark: '🔥', color: '#fd79a8', address: '서울 동대문구 휘경로2가길 1 1층', lat: 37.5950, lng: 127.0615 },
   { id: 'khu_pocketz', brand: '', branch: '포켓츠', category: 'convenience', mark: '🎱', color: '#00b894', address: '서울 동대문구 회기로 113 1층', lat: 37.5900, lng: 127.0500 },
+
+  // ═══ 비식음료 편의시설 (혜택 조건은 참고 데이터로 별도 관리) ═══
+  { id: 'facility_lotte_cinema', brand: '롯데시네마', branch: '청량리점', category: 'culture', mark: '🎬', color: '#e60012', address: '서울 동대문구 왕산로 214', lat: 37.5807, lng: 127.0484 },
+  { id: 'facility_cgv_wangsimni', brand: 'CGV', branch: '왕십리점', category: 'culture', mark: '🎬', color: '#f97316', address: '서울 성동구 왕십리광장로 17', lat: 37.5614, lng: 127.0384 },
+  { id: 'facility_cgv_yongsan', brand: 'CGV', branch: '용산아이파크몰점', category: 'culture', mark: '🎬', color: '#f97316', address: '서울 용산구 한강대로23길 55', lat: 37.5298, lng: 126.9648 },
+  { id: 'facility_megabox_dongdaemun', brand: '메가박스', branch: '동대문점', category: 'culture', mark: '🎬', color: '#351f66', address: '서울 중구 장충단로 247', lat: 37.5668, lng: 127.0078 },
+  { id: 'facility_megabox_coex', brand: '메가박스', branch: '코엑스점', category: 'culture', mark: '🎬', color: '#351f66', address: '서울 강남구 봉은사로 524', lat: 37.5125, lng: 127.0588 },
+  { id: 'facility_khu_bookstore', brand: '', branch: '경희대학교 구내서점', category: 'campus', mark: '책', color: '#4f46e5', address: '경희대학교 서울캠퍼스 청운관', lat: 37.5948, lng: 127.0520 },
+  { id: 'facility_khu_copy', brand: '', branch: '경희대 복사실', category: 'campus', mark: 'P', color: '#7c3aed', address: '경희대학교 서울캠퍼스', lat: 37.5954, lng: 127.0533 },
+  { id: 'facility_emart_everyday', brand: '이마트에브리데이', branch: '이문점', category: 'lifestyle', mark: 'E', color: '#f59e0b', address: '서울 동대문구 이문동 일대', lat: 37.5982, lng: 127.0614 },
+  { id: 'facility_daiso_hoegi', brand: '다이소', branch: '회기역점', category: 'lifestyle', mark: 'D', color: '#e6002d', address: '서울 동대문구 회기로 일대', lat: 37.5894, lng: 127.0565 },
+  { id: 'facility_oliveyoung_hoegi', brand: '올리브영', branch: '회기역점', category: 'lifestyle', mark: 'O', color: '#84bd00', address: '서울 동대문구 회기로 일대', lat: 37.5897, lng: 127.0558 },
+  { id: 'facility_laundry', brand: '', branch: '회기 셀프빨래방', category: 'lifestyle', mark: 'W', color: '#0ea5e9', address: '서울 동대문구 회기동', lat: 37.5905, lng: 127.0527 },
 ]
 
 // ─── 혜택 데이터 (paymentMethodId → 매장/브랜드/업종 매칭) ───
@@ -197,7 +221,10 @@ let BENEFITS = [
   { id: 'b_kakao_plus_cafe', method: 'pay_kakao', storeCategory: 'cafe', type: 'cashback', value: 5, max: 2000, requiresKakaoPlus: true, stackable: true, cond: '카카오페이 플러스 전용 카페 5%(예시)', evidence: '카카오페이 플러스 멤버십(예시)', verified: false },
   { id: 'b_naver_rest', method: 'pay_naver', storeCategory: 'restaurant', type: 'point', value: 1, stackable: true, cond: '현장결제 기본 1% 주장 — 공식 적용 범위 확인 필요', evidence: '공식 상세 URL 미확보', verified: false, calculable: false },
   { id: 'b_naver_cafe', method: 'pay_naver', storeCategory: 'cafe', type: 'point', value: 1, stackable: true, cond: '현장결제 기본 1% 주장 — 공식 적용 범위 확인 필요', evidence: '공식 상세 URL 미확보', verified: false, calculable: false },
-  { id: 'b_danggeun_conv', method: 'pay_danggeun', storeCategory: 'convenience', type: 'cashback', value: 3, max: 2000, stackable: true, cond: '현장결제(QR) 신규 프로모션, 소규모 매장', evidence: '당근페이 현장결제 프로모션(예시)', verified: false },
+  { id: 'b_toss_conv', method: 'pay_toss', storeCategory: 'convenience', type: 'cashback', value: 5, max: 2000, stackable: true, cond: '토스 앱 결제 혜택의 대상 브랜드·기간·사용자 조건 확인 필요', evidence: '토스페이 프로모션 MVP 후보 데이터', verified: false, calculable: false },
+  { id: 'b_toss_cafe', method: 'pay_toss', storeCategory: 'cafe', type: 'cashback', value: 5, max: 2000, stackable: true, cond: '토스 앱 결제 혜택의 대상 카페·기간·사용자 조건 확인 필요', evidence: '토스페이 프로모션 MVP 후보 데이터', verified: false, calculable: false },
+  { id: 'b_toss_rest', method: 'pay_toss', storeCategory: 'restaurant', type: 'cashback', value: 3, max: 2000, stackable: true, cond: '토스 앱 결제 혜택의 대상 음식점·기간·사용자 조건 확인 필요', evidence: '토스페이 프로모션 MVP 후보 데이터', verified: false, calculable: false },
+  { id: 'b_toss_lifestyle', method: 'pay_toss', storeCategory: 'lifestyle', type: 'cashback', value: 5, max: 2000, stackable: true, cond: '토스 앱 결제 혜택의 대상 생활편의 매장·기간 확인 필요', evidence: '토스페이 프로모션 MVP 후보 데이터', verified: false, calculable: false },
 
   // ═══ 카드 - KB (상품설명서 수치 확인 필요) ═══
   { id: 'b_kb_nara_conv', method: 'kb_narasarang', storeCategory: 'convenience', type: 'cashback', value: 5, max: 2000, monthlyCap: 2000, stackable: true, cond: '전월실적 30만원↑ · 월 최대 2천원', evidence: 'KB 나라사랑카드 상품설명서(예시)', verified: false },

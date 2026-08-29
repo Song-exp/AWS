@@ -19,7 +19,29 @@
       <div class="onboarding-head">
         <p class="eyebrow">PAYMENT SETUP</p>
         <h1 id="methodPageTitle">보유 카드와<br><strong>혜택 수단</strong>을 선택하세요</h1>
-        <p class="onboarding-sub">제휴, 카카오톡 톡학생증, 통신사, 페이와 카드를 구분해 선택합니다.</p>
+        <p class="onboarding-sub">시연 사용자를 선택하면 마이데이터 연결을 가정해 계좌·카드·페이를 자동으로 불러옵니다.</p>
+      </div>
+      <section class="demo-connect-card" aria-labelledby="demoConnectTitle">
+        <div class="demo-connect-copy">
+          <span>MYDATA DEMO</span>
+          <strong id="demoConnectTitle">시연 사용자 불러오기</strong>
+          <p>사용자마다 연결된 수단과 맞춤 추천이 다르게 적용됩니다.</p>
+        </div>
+        <label class="onboarding-user-control">
+          <span>사용자 선택</span>
+          <select id="onboardingUserSelect" aria-label="시연 사용자 선택">
+            <option value="">사용자를 선택하세요</option>
+          </select>
+        </label>
+        <div id="myDataStatus" class="mydata-status is-empty" role="status" aria-live="polite">
+          <span class="mydata-status-icon" aria-hidden="true"></span>
+          <p>아직 연결된 정보가 없습니다. 사용자를 선택하거나 아래에서 직접 수단을 추가하세요.</p>
+        </div>
+      </section>
+      <div class="method-guide">
+        <strong>내 결제수단</strong>
+        <span><i class="method-status-dot imported"></i>마이데이터 자동 연결</span>
+        <span><i class="method-status-dot manual"></i>직접 추가</span>
       </div>
       <div id="onboardingGroups" class="onboarding-groups"></div>
     </div>
@@ -51,18 +73,11 @@
         </nav>
         <p class="eyebrow">PERSONAL BENEFIT MAP</p>
         <h1 id="pageTitle">내 수단으로 가장 유리한<br><strong>할인</strong>을 한눈에.</h1>
-        <p id="locationStatus" class="location-status" aria-live="polite">사용자를 바꾸면 보유 카드와 혜택 추천이 즉시 달라집니다.</p>
-      </section>
-
-      <section class="filters" aria-labelledby="filterTitle">
-        <div class="section-heading">
-          <h2 id="filterTitle">업종</h2>
-          <button id="myMethodsChip" class="text-button" type="button">내 수단 0개</button>
-        </div>
-        <div id="categoryFilters" class="pay-filters" role="group" aria-label="업종 필터"></div>
+        <p id="locationStatus" class="location-status" aria-live="polite">가상 사용자를 바꾸면 보유수단과 소비 성향에 맞춰 혜택 순위가 즉시 달라집니다.</p>
       </section>
 
       <section class="filters" aria-labelledby="methodFilterTitle">
+        <div class="personal-recommendation" id="personalRecommendation" aria-live="polite"></div>
         <div class="section-heading">
           <h2 id="methodFilterTitle">내 결제수단</h2>
           <button id="methodAllButton" class="text-button" type="button">전체 켜기</button>
@@ -83,6 +98,7 @@
             </div>
             <label class="sort-label">정렬
               <select id="sortSelect">
+                <option value="personalized">맞춤 추천순</option>
                 <option value="distance">가까운 순</option>
                 <option value="discount">할인 높은 순</option>
               </select>
@@ -90,14 +106,16 @@
           </div>
         </div>
         <div id="mapView" class="map-view">
-          <div class="map-search">경희대 · 회기역 · 외대앞 할인 지도</div>
+          <div class="map-search">경희대 · 회기역 · 외대앞 맞춤 혜택 지도</div>
           <button id="recenterButton" class="map-recenter" type="button" aria-label="전체 서비스 영역 보기">전체 보기</button>
-          <div class="category-legend" aria-label="업종 색상 안내">
-            <span data-category="restaurant">음식점</span>
-            <span data-category="cafe">카페</span>
-            <span data-category="convenience">편의점</span>
+          <div class="map-category-panel">
+            <div class="map-category-head">
+              <strong>어디로 갈까요?</strong>
+              <button id="myMethodsChip" class="text-button" type="button">내 수단 0개</button>
+            </div>
+            <div id="categoryFilters" class="map-category-filters" role="group" aria-label="업종 필터"></div>
           </div>
-          <div id="map" aria-label="경희대학교 주변 할인 지도"></div>
+          <div id="map" aria-label="경희대학교 주변 맞춤 혜택 지도"></div>
           <aside id="mapStoreCard" class="map-store-card" aria-live="polite" hidden></aside>
         </div>
         <div id="benefitList" class="benefit-list" hidden></div>
