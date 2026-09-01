@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import AuthPage from "./pages/AuthPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ChatPage from "./pages/ChatPage";
+import CommunityPage from "./pages/CommunityPage";
 import MapPage from "./pages/MapPage";
 import MyPage from "./pages/MyPage";
 import OnboardingPage from "./pages/OnboardingPage";
@@ -10,9 +13,14 @@ import {
   isDemoPersonaId,
   isPersonaId,
 } from "./personas";
-import type { ProfileSettings, UserProfileLocal } from "./types";
+import {
+  fetchCurrentUser,
+  logout as apiLogout,
+  updateProfile,
+} from "./api";
+import type { AuthUser, ProfileSettings, UserProfileLocal } from "./types";
 
-type Tab = "map" | "chat" | "my";
+type Tab = "map" | "chat" | "community" | "my";
 
 const STORAGE_KEY = "paypick.profile.v1";
 const UUID_PATTERN =
@@ -124,10 +132,67 @@ function loadProfile(): UserProfileLocal | null {
   }
 }
 
+/** 계정에 온보딩 설정이 이미 있는지. 있으면 온보딩을 건너뛴다. */
+function hasServerSettings(user: AuthUser): boolean {
+  return (
+    user.gender !== null &&
+    user.card_ids.length +
+      user.preferred_pay_methods.length +
+      user.student_credentials.length +
+      user.benefit_programs.length >
+      0
+  );
+}
+
+/** 서버 계정 설정을 로컬 프로필 형태로 되싣는다(계정이 진실의 출처). */
+function mergeServerProfile(
+  prev: UserProfileLocal | null,
+  user: AuthUser
+): UserProfileLocal {
+  const base: UserProfileLocal = prev ?? {
+    userId: user.id,
+    personaId: "me",
+    ...settingsForDemo("demo_a"),
+    personalProfile: settingsForDemo("demo_a"),
+  };
+  if (!hasServerSettings(user)) {
+    return { ...base, userId: user.id };
+  }
+  const serverSettings: ProfileSettings = {
+    gender: (user.gender as ProfileSettings["gender"]) ?? null,
+    cardIds: [...user.card_ids],
+    telecom: user.telecom,
+    payMethods: user.preferred_pay_methods as ProfileSettings["payMethods"],
+    studentCredentials:
+      user.student_credentials as ProfileSettings["studentCredentials"],
+    benefitPrograms: user.benefit_programs as ProfileSettings["benefitPrograms"],
+  };
+  return {
+    ...base,
+    userId: user.id,
+    personaId: "me",
+    ...cloneSettings(serverSettings),
+    personalProfile: cloneSettings(serverSettings),
+  };
+}
+
 export default function App() {
   const [profile, setProfile] = useState<UserProfileLocal | null>(null);
   const [onboarding, setOnboarding] = useState(true);
   const [tab, setTab] = useState<Tab>("map");
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  // 메일의 재설정 링크는 ?reset_token=... 으로 들어온다.
+  // 라우터를 두기엔 화면이 하나뿐이라 쿼리스트링만 읽는다.
+  const [resetToken, setResetToken] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).get("reset_token")
+  );
+
+  function clearResetToken() {
+    setResetToken(null);
+    // 토큰이 주소창·히스토리에 남지 않게 지운다.
+    window.history.replaceState({}, "", window.location.pathname);
+  }
 
   useEffect(() => {
     const saved = loadProfile();
@@ -144,6 +209,43 @@ export default function App() {
     setOnboarding(true);
   }, []);
 
+  // 세션 복원. 새로고침해도 로그인이 유지돼야 한다.
+  useEffect(() => {
+    fetchCurrentUser()
+      .then((restored) => {
+        setUser(restored);
+        if (restored) {
+          setProfile((prev) => {
+            const next = mergeServerProfile(prev, restored);
+            saveProfile(next);
+            return next;
+          });
+          setOnboarding(!hasServerSettings(restored));
+        }
+      })
+      .catch(() => setUser(null))
+      .finally(() => setAuthChecked(true));
+  }, []);
+
+  function handleAuthenticated(nextUser: AuthUser) {
+    setUser(nextUser);
+    // userId의 출처를 서버 계정으로 옮긴다. 이후 요청은 세션 쿠키로 인증되고,
+    // localStorage의 UUID는 더 이상 신원 근거가 아니다.
+    setProfile((prev) => {
+      const next = mergeServerProfile(prev, nextUser);
+      saveProfile(next);
+      return next;
+    });
+    // 계정에 설정이 있으면 온보딩을 건너뛴다. 기기를 바꿔도 다시 묻지 않는다.
+    setOnboarding(!hasServerSettings(nextUser));
+  }
+
+  async function handleLogout() {
+    await apiLogout();
+    setUser(null);
+    setOnboarding(true);
+  }
+
   function handleComplete(nextProfile: UserProfileLocal) {
     const personalProfile = cloneSettings(nextProfile);
     const normalized: UserProfileLocal = {
@@ -159,6 +261,16 @@ export default function App() {
     saveProfile(normalized);
     setOnboarding(false);
     setTab("map");
+
+    // 계정에도 남긴다. 실패해도 화면을 막지 않는다(localStorage 에는 이미 저장됨).
+    updateProfile({
+      gender: normalized.gender,
+      telecom: normalized.telecom,
+      card_ids: normalized.cardIds,
+      preferred_pay_methods: normalized.payMethods,
+      student_credentials: normalized.studentCredentials,
+      benefit_programs: normalized.benefitPrograms,
+    }).catch(() => undefined);
   }
 
   function applyPersona(value: string) {
@@ -186,6 +298,34 @@ export default function App() {
       saveProfile(myProfile);
     }
     setOnboarding(true);
+  }
+
+  // 세션 확인이 끝나기 전에 화면을 그리면 로그인 상태인데도 로그인창이
+  // 잠깐 번쩍인다.
+  if (!authChecked) {
+    return (
+      <div className="app">
+        <main className="content">
+          <p className="notice">불러오는 중…</p>
+        </main>
+      </div>
+    );
+  }
+
+  // 로그인이 온보딩보다 앞선다. 온보딩에서 모은 설정을 계정에 붙이려면
+  // 그 시점에 이미 계정이 있어야 한다.
+  // 재설정 링크로 들어왔으면 로그인보다 먼저 처리한다.
+  if (resetToken) {
+    return <ResetPasswordPage token={resetToken} onDone={clearResetToken} />;
+  }
+
+  if (!user) {
+    return (
+      <AuthPage
+        claimUserId={profile?.userId ?? null}
+        onAuthenticated={handleAuthenticated}
+      />
+    );
   }
 
   if (onboarding) {
@@ -242,6 +382,9 @@ export default function App() {
           >
             내 정보 수정
           </button>
+          <button className="text-button" type="button" onClick={handleLogout}>
+            로그아웃
+          </button>
         </div>
       </header>
 
@@ -249,9 +392,18 @@ export default function App() {
         {tab === "map" ? (
           <MapPage profile={profile} />
         ) : tab === "chat" ? (
-          <ChatPage userId={profile?.userId ?? null} />
+          <ChatPage />
+        ) : tab === "community" ? (
+          <CommunityPage />
         ) : (
-          <MyPage profile={profile} />
+          <MyPage
+            profile={profile}
+            user={user}
+            onSignedOut={() => {
+              setUser(null);
+              setOnboarding(true);
+            }}
+          />
         )}
       </main>
 
@@ -273,6 +425,15 @@ export default function App() {
         >
           <span aria-hidden="true">✦</span>
           장학금 챗봇
+        </button>
+        <button
+          role="tab"
+          aria-selected={tab === "community"}
+          className={tab === "community" ? "on" : ""}
+          onClick={() => setTab("community")}
+        >
+          <span aria-hidden="true">▤</span>
+          게시판
         </button>
         <button
           role="tab"

@@ -40,3 +40,8 @@ tiktoken==0.14.0
 # --- Utils ---
 python-dateutil==2.9.0.post0
 tenacity==9.0.0
+
+# --- Test harness ---
+# 배포 규약 검증용. tests/ 는 외부 통신 없이 임시 SQLite로 돈다.
+# CI에서 TEST_DATABASE_URL로 PostgreSQL을 지정해 운영 방언까지 검증한다.
+pytest==8.3.4

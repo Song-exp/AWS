@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.db import get_db
+from app.core.security import current_user, optional_user, rate_limit_chat, require_admin
+from app.models.user import User
 from app.models.application import (
     ApplicationDocument,
     ApplicationSource,
@@ -20,12 +22,16 @@ from app.services import chat as chat_service
 from app.services import indexing
 from app.utils.file_parser import UnsupportedFileType, extract_text
 
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(
+    prefix="/chat",
+    tags=["chat"],
+    # 매 호출이 유료 LLM을 태우므로 분당 상한을 건다.
+    dependencies=[Depends(rate_limit_chat)],
+)
 
 
 class ChatMessageRequest(BaseModel):
     session_id: str | None = None
-    user_id: uuid.UUID | None = None
     message: str
 
 
@@ -47,9 +53,19 @@ class ChatMessageResponse(BaseModel):
 
 
 @router.post("/message", response_model=ChatMessageResponse)
-def send_message(req: ChatMessageRequest, db: Session = Depends(get_db)) -> ChatMessageResponse:
-    """대화 한 턴 처리. 백엔드가 세션 상태와 LLM 대화를 관리한다."""
-    reply = chat_service.handle_message(db, req.session_id, req.user_id, req.message)
+def send_message(
+    req: ChatMessageRequest,
+    user: User | None = Depends(optional_user),
+    db: Session = Depends(get_db),
+) -> ChatMessageResponse:
+    """대화 한 턴 처리. 백엔드가 세션 상태와 LLM 대화를 관리한다.
+
+    로그인은 필수가 아니다. 장학금 탐색은 진입장벽을 낮게 두고, 개인 데이터를
+    쓰거나 남기는 지점(첨부 업로드·초안 저장)에서만 로그인을 요구한다.
+    """
+    reply = chat_service.handle_message(
+        db, req.session_id, user.id if user else None, req.message
+    )
     return ChatMessageResponse(
         session_id=reply.session_id,
         state=reply.state,
@@ -63,8 +79,8 @@ def send_message(req: ChatMessageRequest, db: Session = Depends(get_db)) -> Chat
 @router.post("/upload", response_model=ChatMessageResponse)
 async def upload_in_chat(
     session_id: str | None = Form(default=None),
-    user_id: uuid.UUID | None = Form(default=None),
     file: UploadFile = File(...),
+    user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> ChatMessageResponse:
     """대화 중 과거 신청서(PDF/DOCX/HWP/TXT)를 첨부한다.
@@ -94,10 +110,9 @@ async def upload_in_chat(
             detail="파일에서 텍스트를 추출하지 못했습니다. 이미지로만 된 PDF일 수 있어요.",
         )
 
-    # 세션에 사용자 ID가 없으면 새로 부여(로그인 없는 MVP)
-    sess = chat_service.get_or_create_session(session_id, user_id)
-    if sess.user_id is None:
-        sess.user_id = user_id or uuid.uuid4()
+    # 업로드는 로그인 필수이므로 소유자가 항상 정해져 있다.
+    sess = chat_service.get_or_create_session(session_id, user.id)
+    sess.user_id = user.id
 
     app_row = UserApplication(
         user_id=sess.user_id,
@@ -135,7 +150,11 @@ async def upload_in_chat(
 
 
 # --- 인덱싱 트리거(운영/배치) ---
-index_router = APIRouter(prefix="/admin/index", tags=["admin"])
+index_router = APIRouter(
+    prefix="/admin/index",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 @index_router.post("/run")

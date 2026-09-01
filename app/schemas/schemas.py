@@ -68,9 +68,11 @@ class ApplicationDocumentOut(ApplicationDocumentIn):
 
 
 class ApplicationCreate(BaseModel):
-    """서비스로 작성한 신청서 저장(플라이휠: source=generated)."""
+    """서비스로 작성한 신청서 저장(플라이휠: source=generated).
 
-    user_id: uuid.UUID
+    소유자는 세션에서 판단한다. 요청 바디의 user_id는 위조 가능하므로 받지 않는다.
+    """
+
     scholarship_name: str
     organization: str | None = None
     scholarship_id: int | None = None
@@ -118,7 +120,6 @@ class QAResponse(BaseModel):
 
 # ---------- 초안 생성 ----------
 class DraftRequest(BaseModel):
-    user_id: uuid.UUID
     scholarship_id: int
     questions: list[str]  # 새 공고의 문항들
 

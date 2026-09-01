@@ -32,6 +32,12 @@ def _scheduled_job() -> None:
             "monthly crawl done: run_id=%s status=%s saved=%s expired=%s",
             run.id, run.status, run.total_saved, run.total_expired,
         )
+        # 만료·폐기된 세션 정리. 검증이 만료를 확인하므로 기능상 필수는
+        # 아니지만, 두면 auth_sessions 가 무한정 자란다.
+        from app.core.security import purge_expired_sessions
+
+        purged = purge_expired_sessions(db)
+        logger.info("expired sessions purged: %s", purged)
     except Exception:  # noqa: BLE001
         logger.exception("scheduled monthly crawl failed")
     finally:

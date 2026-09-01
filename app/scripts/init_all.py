@@ -21,6 +21,7 @@ from typing import Literal
 from app.core.db import SessionLocal, init_db
 from app.crawlers.registry import run_monthly_update
 from app.models.crawl_run import CrawlRunStatus
+from app.scripts.seed_boards import seed_boards
 from app.scripts.seed_card_benefits import seed as seed_card_benefits
 from app.scripts.seed_category_stores import seed as seed_category_stores
 from app.scripts.seed_sample_scholarships import seed as seed_sample_scholarships
@@ -76,6 +77,7 @@ def initialize_all(
         "category_stores": seed_category_stores(),
         "local_benefits": seed_local_benefits(),
         "card_benefits": seed_card_benefits(),
+        "boards": seed_boards(),
     }
 
     if scholarship_mode == "sample":

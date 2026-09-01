@@ -14,7 +14,7 @@ from sqlalchemy import DateTime, Float, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
-from app.core.types import GUIDType, StrListType
+from app.core.types import GUIDType, JSONType, StrListType
 
 
 class User(Base):
@@ -23,7 +23,12 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(GUIDType, primary_key=True, default=uuid.uuid4)
 
     nickname: Mapped[str | None] = mapped_column(String(50))
+    # 이메일은 소문자로 정규화해 저장한다(대소문자만 다른 중복 가입 방지).
     email: Mapped[str | None] = mapped_column(String(200), unique=True, index=True)
+
+    # scrypt 해시. 'scrypt$n$r$p$salt$hash' 형식(app.core.security 참고).
+    # 익명 사용자는 계정이 없으므로 nullable 이다.
+    password_hash: Mapped[str | None] = mapped_column(String(255))
 
     # --- 장학금 매칭용 프로필 ---
     income_bracket: Mapped[int | None] = mapped_column(Integer)   # 소득분위 0~10
@@ -34,7 +39,15 @@ class User(Base):
     interests: Mapped[list[str]] = mapped_column(StrListType, default=list)
 
     # --- 지도(페이픽) 개인화 ---
+    # 온보딩에서 모으던 값들. 지금까지 localStorage 에만 있어서 기기를 바꾸면
+    # 사라졌고 서버가 개인화에 쓰지도 못했다. 계정이 생겼으므로 여기로 올린다.
     preferred_pay_methods: Mapped[list[str]] = mapped_column(StrListType, default=list)
+    gender: Mapped[str | None] = mapped_column(String(10))          # 'male' | 'female'
+    telecom: Mapped[str | None] = mapped_column(String(30))
+    # 보유 카드 ID 목록. 정수 배열이라 StrListType 대신 JSON 을 쓴다.
+    card_ids: Mapped[list] = mapped_column(JSONType, default=list)
+    student_credentials: Mapped[list[str]] = mapped_column(StrListType, default=list)
+    benefit_programs: Mapped[list[str]] = mapped_column(StrListType, default=list)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

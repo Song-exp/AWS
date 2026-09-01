@@ -54,24 +54,57 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
 
 
 # ---------------- Chat (DeepSeek) ----------------
+def _client():
+    """OpenAI 호환 클라이언트. 타임아웃을 반드시 건다.
+
+    타임아웃이 없으면 외부 API가 느려질 때 uvicorn 워커가 그대로 붙잡혀
+    다른 요청까지 막힌다(동기 엔드포인트라 워커 1개 = 요청 1개).
+    """
+    from openai import OpenAI
+
+    return OpenAI(
+        api_key=settings.deepseek_api_key,
+        base_url=settings.llm_base_url,
+        timeout=settings.llm_timeout_sec,
+        max_retries=0,  # 재시도는 아래 tenacity가 관장한다(이중 재시도 방지)
+    )
+
+
 def chat_complete(system_prompt: str, user_prompt: str, temperature: float = 0.2) -> str:
-    """DeepSeek chat 완성. 키가 없으면 LLMConfigError 대신 호출부가
-    has_llm()으로 사전 분기하는 것을 권장한다."""
+    """DeepSeek chat 완성. 키가 없으면 호출부가 has_llm()으로 사전 분기한다.
+
+    일시적 오류(타임아웃/5xx/레이트리밋)만 지수 백오프로 재시도하고,
+    모두 실패하면 예외를 그대로 올려 호출부가 규칙기반 폴백을 타게 한다.
+    """
     if not settings.deepseek_api_key:
         raise RuntimeError("DEEPSEEK_API_KEY 미설정: 규칙기반 폴백 경로를 사용하세요.")
 
-    from openai import OpenAI
+    from tenacity import (
+        retry,
+        retry_if_exception_type,
+        stop_after_attempt,
+        wait_exponential,
+    )
 
-    client = OpenAI(
-        api_key=settings.deepseek_api_key,
-        base_url=settings.llm_base_url,
+    from openai import APIConnectionError, APITimeoutError, InternalServerError, RateLimitError
+
+    @retry(
+        retry=retry_if_exception_type(
+            (APITimeoutError, APIConnectionError, RateLimitError, InternalServerError)
+        ),
+        stop=stop_after_attempt(settings.llm_max_retries + 1),
+        wait=wait_exponential(multiplier=0.5, max=4),
+        reraise=True,
     )
-    resp = client.chat.completions.create(
-        model=settings.llm_model,
-        temperature=temperature,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    )
-    return resp.choices[0].message.content or ""
+    def _call() -> str:
+        resp = _client().chat.completions.create(
+            model=settings.llm_model,
+            temperature=temperature,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        return resp.choices[0].message.content or ""
+
+    return _call()

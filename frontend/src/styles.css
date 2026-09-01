@@ -1495,3 +1495,241 @@ button:disabled { cursor: default; opacity: 0.5; }
   .send-button { width: 42px; padding: 0; font-size: 0; }
   .send-button span { font-size: 17px; }
 }
+
+/* ---- 세이빙 대시보드(기획서 3.3) ---- */
+.saving-summary {
+  background: linear-gradient(135deg, #7b2cbf, #5a189a);
+  color: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 14px;
+}
+
+.saving-month {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.saving-amount {
+  display: block;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 4px 0 8px;
+}
+
+.saving-reward {
+  margin: 0 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.saving-reward.muted {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.saving-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.saving-metrics span {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.saving-total {
+  margin: 12px 0 0;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* ---- 로그인 / 회원가입 ---- */
+.auth-page {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 32px 20px 48px;
+}
+
+.auth-lead {
+  margin: 8px 0 0;
+  font-size: 14px;
+  opacity: 0.75;
+  line-height: 1.5;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.auth-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auth-form input {
+  padding: 12px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.auth-form input:focus {
+  outline: 2px solid #7b2cbf;
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.auth-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #5a189a;
+  background: rgba(123, 44, 191, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.auth-submit {
+  margin-top: 6px;
+  padding: 13px;
+  border: 0;
+  border-radius: 10px;
+  background: #7b2cbf;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.auth-switch {
+  display: block;
+  width: 100%;
+  margin-top: 18px;
+  padding: 10px;
+  border: 0;
+  background: none;
+  color: #5a189a;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ---- 계정 설정 ---- */
+.account-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-identity {
+  background: rgba(123, 44, 191, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.account-label {
+  display: block;
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+
+.account-block {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-block h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.account-block label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.account-block input {
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.account-block button {
+  align-self: flex-start;
+  padding: 9px 16px;
+  border: 1px solid #7b2cbf;
+  border-radius: 8px;
+  background: #fff;
+  color: #7b2cbf;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.account-block button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.account-desc {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.75;
+  line-height: 1.5;
+}
+
+.account-block.danger {
+  border-color: rgba(200, 30, 30, 0.35);
+}
+
+.account-block.danger h3 {
+  color: #c81e1e;
+}
+
+.account-block.danger button {
+  border-color: #c81e1e;
+  color: #c81e1e;
+}
+
+.account-block .danger-button {
+  background: #c81e1e;
+  color: #fff;
+}
+
+.account-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.notice.success {
+  color: #1b7f3b;
+}

@@ -1,7 +1,8 @@
 """마이페이지 API.
 
 사용자의 신청 이력, 저장된 자기소개서(문서), 보유 카드 정보를 조회한다.
-로그인 없는 MVP라 user_id를 쿼리로 받는다(프론트는 localStorage 프로필의 user_id 사용).
+대상 사용자는 세션 쿠키에서 판단한다. 예전처럼 user_id를 쿼리로 받으면
+UUID만 아는 사람이 남의 자기소개서를 전부 읽을 수 있었다.
 """
 from __future__ import annotations
 
@@ -13,6 +14,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.db import get_db
+from app.core.security import current_user
+from app.models.user import User
 from app.models.application import ApplicationDocument, UserApplication
 from app.models.card import Card
 
@@ -56,8 +59,8 @@ class MyPageOut(BaseModel):
 
 @router.get("/summary", response_model=MyPageOut)
 def my_summary(
-    user_id: uuid.UUID,
     card_ids: list[int] | None = Query(default=None),
+    user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> MyPageOut:
     """마이페이지 한 번에 조회: 신청이력 + 자기소개서 + 보유카드.
@@ -65,6 +68,7 @@ def my_summary(
     card_ids는 온보딩에서 고른 보유 카드 ID(프론트 localStorage). 지정 시
     카드 정보를 함께 반환한다.
     """
+    user_id = user.id
     apps = db.scalars(
         select(UserApplication)
         .where(UserApplication.user_id == user_id)

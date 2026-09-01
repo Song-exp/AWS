@@ -15,7 +15,21 @@ from app.models.card import (
     PeriodType,
 )
 from app.models.user import User
+from app.models.auth_session import AuthSession
+from app.models.password_reset import PasswordResetToken
+from app.models.community import (
+    Board,
+    BoardCategory,
+    BoardRead,
+    Comment,
+    CommentLike,
+    Post,
+    PostLike,
+    Report,
+    Scrap,
+)
 from app.models.local_benefit import LocalBenefitMerchant
+from app.models.saving import SavingKind, SavingRecord
 
 __all__ = [
     # 장학금 챗봇
@@ -37,6 +51,19 @@ __all__ = [
     "Confidence",
     "PeriodType",
     "LocalBenefitMerchant",
+    "SavingRecord",
+    "SavingKind",
     # 공통
     "User",
+    "AuthSession",
+    "PasswordResetToken",
+    "Board",
+    "BoardCategory",
+    "BoardRead",
+    "Comment",
+    "CommentLike",
+    "Post",
+    "PostLike",
+    "Report",
+    "Scrap",
 ]

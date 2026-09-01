@@ -373,6 +373,49 @@ def note_upload(db: Session, session_id: str | None, user_id: uuid.UUID | None,
     )
 
 
+# 계정에 저장되는 매칭 조건. 대화에서 알아낸 값을 여기에 싣고 되싣는다.
+_PERSISTED_PROFILE_FIELDS = ("income_bracket", "gpa", "grade_level", "region", "major")
+
+
+def _load_profile_from_account(db: Session, sess: ChatSession) -> None:
+    """계정에 저장된 조건을 대화 프로필의 출발점으로 삼는다.
+
+    대화 세션은 프로세스 메모리에 있어 서버가 재시작하면 사라진다. 계정에
+    붙여 두면 사용자가 소득분위·학점을 매번 다시 말하지 않아도 된다.
+    """
+    if sess.user_id is None:
+        return
+    from app.models.user import User
+
+    user = db.get(User, sess.user_id)
+    if user is None:
+        return
+    for field in _PERSISTED_PROFILE_FIELDS:
+        if getattr(sess.profile, field, None) is None:
+            value = getattr(user, field, None)
+            if value is not None:
+                setattr(sess.profile, field, value)
+
+
+def _save_profile_to_account(db: Session, sess: ChatSession) -> None:
+    """대화에서 알아낸 조건을 계정에 남긴다(비로그인이면 아무것도 안 한다)."""
+    if sess.user_id is None:
+        return
+    from app.models.user import User
+
+    user = db.get(User, sess.user_id)
+    if user is None:
+        return
+    changed = False
+    for field in _PERSISTED_PROFILE_FIELDS:
+        value = getattr(sess.profile, field, None)
+        if value is not None and getattr(user, field, None) != value:
+            setattr(user, field, value)
+            changed = True
+    if changed:
+        db.commit()
+
+
 def handle_message(
     db: Session, session_id: str | None, user_id: uuid.UUID | None, text: str
 ) -> BotReply:
@@ -380,6 +423,7 @@ def handle_message(
     sess = get_or_create_session(session_id, user_id)
     if user_id and sess.user_id is None:
         sess.user_id = user_id
+    _load_profile_from_account(db, sess)
     text = (text or "").strip()
     sess.history.append(("user", text))
 
@@ -416,6 +460,8 @@ def handle_message(
 
     # 4) 그 외: 조건 갱신 + 재검색 + LLM 대화 (어떤 상태에서도 막히지 않음)
     _parse_profile(text, sess.profile)
+    # 알아낸 조건은 계정에 남긴다. 다음 대화에서 다시 묻지 않기 위해서다.
+    _save_profile_to_account(db, sess)
     total = _scholarship_total(db)
     cands = _search_candidates(db, sess) if sess.profile.income_bracket is not None else []
     sess.state = ChatState.SELECT if cands else ChatState.COLLECT

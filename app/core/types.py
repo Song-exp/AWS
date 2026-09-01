@@ -65,9 +65,13 @@ class GUIDType(TypeDecorator):
 
 
 def vector_column(dim: int) -> TypeEngine:
-    """방언에 맞는 임베딩 벡터 컬럼 타입."""
-    if is_postgres():
-        from pgvector.sqlalchemy import Vector
+    """방언에 맞는 임베딩 벡터 컬럼 타입.
 
-        return Vector(dim)
-    return JSON()
+    주의: with_variant로 **DDL 발행 시점의 방언**에 따라 결정해야 한다.
+    settings.database_url을 import 시점에 읽어 분기하면, SQLite로 오토제너레이트한
+    Alembic 마이그레이션에 JSON이 박혀 PostgreSQL에 vector 대신 json 컬럼이
+    생긴다(그러면 pgvector 검색이 조용히 죽는다).
+    """
+    from pgvector.sqlalchemy import Vector
+
+    return JSON().with_variant(Vector(dim), "postgresql")

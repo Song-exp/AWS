@@ -30,7 +30,6 @@ export interface ChatResponse {
 
 export interface ChatRequest {
   session_id: string | null;
-  user_id: string | null;
   message: string;
 }
 
@@ -248,4 +247,134 @@ export interface MyPageData {
   documents: MyDocument[];
   cards: MyCard[];
   counts: Record<string, number>;
+}
+
+/** 세이빙 대시보드(기획서 3.3) */
+export interface SavingRecord {
+  id: number;
+  kind: string;
+  store_label: string;
+  original_amount: number;
+  final_amount: number;
+  saved_amount: number;
+  method_label: string;
+  created_at: string | null;
+}
+
+export interface SavingReward {
+  label: string;
+  count: number;
+  message: string;
+}
+
+export interface SavingSummary {
+  user_id: string;
+  month: string;
+  month_saved: number;
+  total_saved: number;
+  month_count: number;
+  viewed_count: number;
+  /** 소비완료 / 혜택조회. KPI 목표 0.25 */
+  conversion_rate: number;
+  reward: SavingReward | null;
+  recent: SavingRecord[];
+}
+
+export interface SpendPayload {
+  user_id: string;
+  store_id?: number | null;
+  store_label?: string;
+  original_amount: number;
+  final_amount: number;
+  method_label?: string;
+}
+
+/** 로그인한 사용자(서버 세션 기준). userId의 출처는 이제 서버다. */
+export interface AuthUser {
+  id: string;
+  email: string | null;
+  nickname: string | null;
+  income_bracket: number | null;
+  gpa: number | null;
+  grade_level: string | null;
+  region: string | null;
+  major: string | null;
+  interests: string[];
+  preferred_pay_methods: string[];
+  gender: string | null;
+  telecom: string | null;
+  card_ids: number[];
+  student_credentials: string[];
+  benefit_programs: string[];
+}
+
+// ===== 커뮤니티 =====
+export type BoardCategory = "general" | "career" | "promo" | "group";
+
+export interface CommunityBoard {
+  id: number;
+  slug: string;
+  name: string;
+  description: string | null;
+  category: BoardCategory;
+  allows_anonymous: boolean;
+  forces_anonymous: boolean;
+  /** 마지막으로 읽은 뒤 새 글이 있는지 — 목록의 N 뱃지 */
+  has_new: boolean;
+}
+
+export interface PostSummary {
+  id: number;
+  board_id: number;
+  board_name: string;
+  title: string;
+  preview: string;
+  author_label: string;
+  is_question: boolean;
+  like_count: number;
+  comment_count: number;
+  created_at: string | null;
+  is_mine: boolean;
+}
+
+export interface PostComment {
+  id: number;
+  parent_id: number | null;
+  body: string;
+  author_label: string;
+  like_count: number;
+  liked_by_me: boolean;
+  is_mine: boolean;
+  is_deleted: boolean;
+  created_at: string | null;
+}
+
+export interface PostDetail {
+  id: number;
+  board_id: number;
+  board_name: string;
+  title: string;
+  body: string;
+  author_label: string;
+  is_question: boolean;
+  like_count: number;
+  comment_count: number;
+  view_count: number;
+  liked_by_me: boolean;
+  scrapped_by_me: boolean;
+  is_mine: boolean;
+  created_at: string | null;
+  comments: PostComment[];
+}
+
+export interface PostPage {
+  items: PostSummary[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+export interface ToggleResult {
+  active: boolean;
+  count: number;
 }

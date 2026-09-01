@@ -15,11 +15,7 @@ const GREETING =
 
 const ACCEPT = ".pdf,.docx,.hwpx,.hwp,.txt";
 
-interface Props {
-  userId: string | null;
-}
-
-export default function ChatPage({ userId }: Props) {
+export default function ChatPage() {
   const [messages, setMessages] = useState<Msg[]>([
     { role: "bot", text: GREETING },
   ]);
@@ -50,7 +46,6 @@ export default function ChatPage({ userId }: Props) {
     try {
       const response = await sendMessage({
         session_id: sessionId,
-        user_id: userId,
         message: trimmed,
       });
       setSessionId(response.session_id);
@@ -86,7 +81,7 @@ export default function ChatPage({ userId }: Props) {
     setUploading(true);
 
     try {
-      const response = await uploadChatFile(file, sessionId, userId);
+      const response = await uploadChatFile(file, sessionId);
       setSessionId(response.session_id);
       setMessages((current) => [
         ...current,

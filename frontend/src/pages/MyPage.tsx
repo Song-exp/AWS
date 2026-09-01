@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
-import { fetchMyPage } from "../api";
+import { fetchMyPage, fetchSavingsSummary } from "../api";
 import { DEMO_PERSONAS, getPersonaForProfile } from "../personas";
-import type { MyPageData, UserProfileLocal } from "../types";
+import AccountSettings from "../components/AccountSettings";
+import type { AuthUser, MyPageData, SavingSummary, UserProfileLocal } from "../types";
 
 interface Props {
   profile: UserProfileLocal | null;
+  user: AuthUser;
+  onSignedOut: () => void;
 }
 
 const RESULT_LABELS: Record<string, string> = {
@@ -27,13 +30,14 @@ const RANKED_PERSONAS = [...DEMO_PERSONAS].sort(
 
 const formatWon = (amount: number) => `${amount.toLocaleString("ko-KR")}원`;
 
-export default function MyPage({ profile }: Props) {
+export default function MyPage({ profile, user, onSignedOut }: Props) {
   const [data, setData] = useState<MyPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"applications" | "documents" | "cards">(
-    "applications"
-  );
+  const [savings, setSavings] = useState<SavingSummary | null>(null);
+  const [tab, setTab] = useState<
+    "savings" | "applications" | "documents" | "cards" | "account"
+  >("savings");
 
   useEffect(() => {
     if (!profile) {
@@ -41,11 +45,19 @@ export default function MyPage({ profile }: Props) {
       return;
     }
     setLoading(true);
-    fetchMyPage(profile.userId, profile.cardIds)
+    fetchMyPage(profile.cardIds)
       .then(setData)
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [profile?.userId, profile?.cardIds]);
+
+  useEffect(() => {
+    if (!profile) return;
+    // 세이빙은 보조 지표라 실패해도 마이페이지 전체를 막지 않는다.
+    fetchSavingsSummary()
+      .then(setSavings)
+      .catch(() => setSavings(null));
+  }, [profile?.userId]);
 
   if (!profile) {
     return <div className="mypage"><p className="notice">먼저 온보딩에서 내 정보를 입력해주세요.</p></div>;
@@ -76,16 +88,67 @@ export default function MyPage({ profile }: Props) {
           <span>신청 {data.counts.applications ?? 0}</span>
           <span>자기소개서 {data.counts.documents ?? 0}</span>
           <span>보유 카드 {data.counts.cards ?? 0}</span>
+          {savings && <span>이번 달 {formatWon(savings.month_saved)} 세이브</span>}
         </div>
       </section>
 
       <div className="mypage-tabs" role="tablist">
+        <button role="tab" aria-selected={tab === "savings"} className={tab === "savings" ? "on" : ""} onClick={() => setTab("savings")}>세이빙</button>
         <button role="tab" aria-selected={tab === "applications"} className={tab === "applications" ? "on" : ""} onClick={() => setTab("applications")}>신청 기록</button>
         <button role="tab" aria-selected={tab === "documents"} className={tab === "documents" ? "on" : ""} onClick={() => setTab("documents")}>자기소개서</button>
         <button role="tab" aria-selected={tab === "cards"} className={tab === "cards" ? "on" : ""} onClick={() => setTab("cards")}>보유 카드</button>
+        <button role="tab" aria-selected={tab === "account"} className={tab === "account" ? "on" : ""} onClick={() => setTab("account")}>계정</button>
       </div>
 
       <div className="mypage-body">
+        {tab === "account" && (
+          <AccountSettings user={user} onSignedOut={onSignedOut} />
+        )}
+
+        {tab === "savings" && (
+          !savings ? (
+            <p className="notice">세이빙 기록을 불러오지 못했어요.</p>
+          ) : (
+            <>
+              <section className="saving-summary">
+                <p className="saving-month">{savings.month} 누적</p>
+                <strong className="saving-amount">{formatWon(savings.month_saved)}</strong>
+                {savings.reward ? (
+                  <p className="saving-reward">{savings.reward.message}</p>
+                ) : (
+                  <p className="saving-reward muted">
+                    지도에서 혜택을 쓰고 '소비 완료'를 누르면 절감액이 쌓여요.
+                  </p>
+                )}
+                <div className="saving-metrics">
+                  <span>소비 완료 {savings.month_count}건</span>
+                  <span>혜택 조회 {savings.viewed_count}건</span>
+                  <span>전환율 {Math.round(savings.conversion_rate * 100)}%</span>
+                </div>
+                <p className="saving-total">전체 누적 {formatWon(savings.total_saved)}</p>
+              </section>
+
+              {savings.recent.length === 0 ? (
+                <p className="notice">아직 소비 완료 기록이 없어요.</p>
+              ) : (
+                savings.recent.map((r) => (
+                  <div key={r.id} className="mypage-card">
+                    <div className="mypage-card-top">
+                      <strong>{r.store_label || "매장 미지정"}</strong>
+                      <span className="badge">-{formatWon(r.saved_amount)}</span>
+                    </div>
+                    <p className="mypage-meta">
+                      {formatWon(r.original_amount)} → {formatWon(r.final_amount)}
+                      {r.method_label ? ` · ${r.method_label}` : ""}
+                      {r.created_at ? ` · ${r.created_at.slice(0, 10)}` : ""}
+                    </p>
+                  </div>
+                ))
+              )}
+            </>
+          )
+        )}
+
         {tab === "applications" && (
           data.applications.length === 0 ? (
             <p className="notice">아직 신청 기록이 없어요. 챗봇에서 장학금을 찾아 지원서를 저장해보세요.</p>

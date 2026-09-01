@@ -9,10 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
+from app.core.security import require_admin
 from app.crawlers.registry import run_monthly_update
 from app.models.crawl_run import CrawlRun, CrawlRunStatus
 
-router = APIRouter(prefix="/admin/crawl", tags=["admin"])
+router = APIRouter(
+    prefix="/admin/crawl",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
 
 
 class CrawlRunOut(BaseModel):

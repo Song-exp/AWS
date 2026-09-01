@@ -1,0 +1,217 @@
+/* ================= 커뮤니티 ================= */
+.board-list { padding: 12px 16px 24px; }
+
+.board-chips { display: flex; gap: 8px; margin-bottom: 14px; }
+.board-chip {
+  padding: 9px 18px; border: 1px solid rgba(0,0,0,.15); border-radius: 999px;
+  background: #fff; font-size: 14px; font-weight: 600; font-family: inherit;
+  cursor: pointer;
+}
+.board-chip.on { background: #111; color: #fff; border-color: #111; }
+
+.board-search {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 18px;
+  background: #f2f3f5; border-radius: 12px; padding: 11px 14px;
+}
+.board-search input {
+  flex: 1; border: 0; background: none; font-size: 14px; font-family: inherit;
+  outline: none;
+}
+
+.board-shortcuts, .board-items { list-style: none; margin: 0; padding: 0; }
+.board-shortcuts {
+  border-bottom: 1px solid rgba(0,0,0,.08);
+  padding-bottom: 8px; margin-bottom: 8px;
+}
+.board-shortcuts button, .board-items button {
+  display: flex; align-items: center; gap: 14px; width: 100%;
+  padding: 13px 4px; border: 0; background: none; font-size: 16px;
+  font-family: inherit; cursor: pointer; text-align: left;
+}
+.shortcut-icon {
+  width: 28px; height: 28px; border-radius: 7px;
+  display: grid; place-items: center; font-size: 15px;
+}
+.shortcut-icon.blue { background: #dbeafe; }
+.shortcut-icon.teal { background: #ccfbf1; }
+.shortcut-icon.amber { background: #fef3c7; }
+.shortcut-icon.red { background: #fee2e2; }
+.shortcut-icon.grey { background: #eef0f2; }
+
+.board-pin { width: 28px; text-align: center; }
+.board-name { flex: 1; }
+.board-new {
+  background: #e5342b; color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: 50%; width: 17px; height: 17px;
+  display: grid; place-items: center;
+}
+
+/* ---- 글 목록 ---- */
+.board-page, .post-detail { padding-bottom: 90px; }
+.board-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid rgba(0,0,0,.07);
+}
+.board-title { flex: 1; display: flex; flex-direction: column; line-height: 1.25; }
+.board-title strong { font-size: 16px; }
+.board-title span { font-size: 12px; opacity: .6; }
+.icon-button {
+  border: 0; background: none; font-size: 19px; cursor: pointer;
+  padding: 4px 8px; font-family: inherit;
+}
+
+.question-strip { display: flex; gap: 10px; overflow-x: auto; padding: 14px; }
+.question-card {
+  flex: 0 0 66%; text-align: left; border: 0; border-radius: 12px;
+  background: #e6f7f6; padding: 13px; display: flex; flex-direction: column;
+  gap: 4px; font-family: inherit; cursor: pointer;
+}
+.question-badge { font-size: 11px; color: #0d9488; font-weight: 700; }
+.question-card strong { font-size: 14px; }
+.question-preview {
+  font-size: 12px; opacity: .7;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.hot-strip {
+  display: flex; align-items: center; gap: 10px; width: calc(100% - 28px);
+  margin: 0 14px 8px; padding: 12px 14px; border: 0; border-radius: 12px;
+  background: #fef2f2; font-family: inherit; font-size: 14px; cursor: pointer;
+}
+.hot-title {
+  flex: 1; text-align: left; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.hot-likes { color: #e5342b; font-size: 13px; font-weight: 600; }
+
+.post-list { list-style: none; margin: 0; padding: 0; }
+.post-list > li { border-bottom: 1px solid rgba(0,0,0,.07); }
+.post-list button {
+  display: flex; flex-direction: column; gap: 5px; width: 100%;
+  padding: 16px; border: 0; background: none; text-align: left;
+  font-family: inherit; cursor: pointer;
+}
+.post-title { font-size: 15px; }
+.post-preview {
+  font-size: 13px; opacity: .8; line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.post-meta { font-size: 12px; opacity: .55; display: flex; gap: 8px; }
+.post-count { opacity: .9; }
+
+.load-more {
+  display: block; width: calc(100% - 32px); margin: 14px 16px;
+  padding: 12px; border: 1px solid rgba(0,0,0,.15); border-radius: 10px;
+  background: #fff; font-family: inherit; font-size: 14px; cursor: pointer;
+}
+
+.write-fab {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 78px;
+  padding: 12px 22px; border: 0; border-radius: 999px;
+  background: #fff; box-shadow: 0 3px 14px rgba(0,0,0,.18);
+  font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+
+/* ---- 글쓰기 ---- */
+.compose-backdrop {
+  position: fixed; inset: 0; background: #fff; z-index: 50;
+  display: flex; flex-direction: column;
+}
+.compose { display: flex; flex-direction: column; height: 100%; }
+.compose header {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.compose header strong { flex: 1; text-align: center; }
+.compose-submit {
+  border: 0; border-radius: 8px; background: #7b2cbf; color: #fff;
+  padding: 8px 16px; font-family: inherit; font-weight: 600; cursor: pointer;
+}
+.compose-submit:disabled { opacity: .5; }
+.compose-title, .compose-body {
+  border: 0; padding: 14px 16px; font-family: inherit; outline: none;
+  font-size: 15px;
+}
+.compose-title { border-bottom: 1px solid rgba(0,0,0,.07); font-weight: 600; }
+.compose-body { flex: 1; resize: none; line-height: 1.6; }
+.compose-options {
+  display: flex; gap: 16px; padding: 12px 16px;
+  border-top: 1px solid rgba(0,0,0,.07); font-size: 13px;
+}
+.compose-options label { display: flex; align-items: center; gap: 6px; }
+.compose-options em { opacity: .6; font-size: 11px; }
+
+/* ---- 글 상세 ---- */
+.post-body { padding: 16px; }
+.post-author { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.post-author div { display: flex; flex-direction: column; }
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%; background: #eef0f2;
+  display: grid; place-items: center; font-size: 17px;
+}
+.post-stamp { font-size: 12px; opacity: .55; }
+.post-body h1 { font-size: 19px; margin: 0 0 10px; }
+.post-text {
+  font-size: 15px; line-height: 1.65;
+  white-space: pre-wrap; word-break: break-word;
+}
+.post-text a { color: #1d7fd9; }
+
+.post-actions {
+  display: flex; border-top: 1px solid rgba(0,0,0,.07);
+  border-bottom: 1px solid rgba(0,0,0,.07);
+}
+.post-actions button {
+  flex: 1; padding: 13px; border: 0; background: none; font-family: inherit;
+  font-size: 14px; color: #7a7f87; cursor: pointer;
+}
+.post-actions button.on { color: #7b2cbf; font-weight: 600; }
+
+.comment-list { padding: 4px 16px 16px; }
+.comment-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 52px 0; opacity: .45; font-size: 14px;
+}
+.comment-empty span { font-size: 40px; }
+.comment-row { padding: 13px 0; border-bottom: 1px solid rgba(0,0,0,.05); }
+.comment-row.deleted { opacity: .5; }
+.comment-head { display: flex; align-items: baseline; gap: 8px; }
+.comment-head strong { font-size: 13px; }
+.comment-row p {
+  margin: 5px 0 7px; font-size: 14px; line-height: 1.55; white-space: pre-wrap;
+}
+.comment-actions { display: flex; gap: 12px; }
+.comment-actions button {
+  border: 0; background: none; font-size: 12px; color: #8b9098;
+  font-family: inherit; cursor: pointer; padding: 0;
+}
+.comment-actions button.on { color: #7b2cbf; font-weight: 600; }
+.comment-reply { padding-left: 20px; border-left: 2px solid rgba(0,0,0,.07); }
+
+.comment-form {
+  position: fixed; left: 0; right: 0; bottom: 58px; background: #fff;
+  border-top: 1px solid rgba(0,0,0,.08); padding: 8px 12px;
+}
+.reply-hint {
+  display: flex; gap: 10px; font-size: 12px; opacity: .7; padding: 4px 4px 8px;
+}
+.reply-hint button {
+  border: 0; background: none; color: #7b2cbf; font-family: inherit; cursor: pointer;
+}
+.comment-input-row {
+  display: flex; align-items: center; gap: 8px;
+  background: #f2f3f5; border-radius: 10px; padding: 7px 10px;
+}
+.anon-toggle {
+  display: flex; align-items: center; gap: 4px; font-size: 12px;
+  color: #e5342b; font-weight: 600; white-space: nowrap;
+}
+.comment-input-row input {
+  flex: 1; border: 0; background: none; outline: none;
+  font-size: 14px; font-family: inherit;
+}
+.comment-send {
+  border: 0; background: none; color: #e5342b; font-size: 17px; cursor: pointer;
+}
+.comment-send:disabled { opacity: .4; }
