@@ -119,9 +119,13 @@ def _extract_pdf_bytes(content: bytes) -> str:
 
 def _extract_docx_bytes(content: bytes) -> str:
     import io
+    import zipfile
 
     import docx
 
+    # 파일 경로 쪽과 같은 검사. 여기는 크롤러가 받은 첨부가 들어온다.
+    with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        _guard_zip_size(zf)
     document = docx.Document(io.BytesIO(content))
     return "\n".join(p.text for p in document.paragraphs).strip()
 

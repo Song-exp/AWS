@@ -444,3 +444,63 @@ def test_real_user_data_in_data_dir_is_gitignored():
     ):
         r = subprocess.run(["git", "check-ignore", path], capture_output=True)
         assert r.returncode == 0, f"{path} 가 .gitignore 에 걸리지 않는다"
+
+
+# ---------------- 개인정보가 외부 LLM으로 새지 않는지 ----------------
+def test_past_answers_are_masked_before_leaving_for_the_llm(auth_client, db, monkeypatch):
+    """과거 신청서 본문은 외부 LLM으로 그대로 나간다.
+
+    신청서에는 주민번호·연락처가 섞여 있다. 임베딩 전에는 마스킹하고 있었는데
+    초안 생성 프롬프트에는 원문이 실려 나갔다.
+    """
+    import app.services.llm as llm
+
+    created = auth_client.post(
+        "/applications",
+        json={
+            "scholarship_name": "과거 신청서",
+            "documents": [{
+                "doc_type": "self_intro",
+                "content_text": "주민번호 990101-1234567, 연락처 010-1234-5678 입니다.",
+            }],
+        },
+    )
+    assert created.status_code == 200, created.text
+
+    prompts: list[str] = []
+    monkeypatch.setattr(llm, "has_llm", lambda: True)
+    monkeypatch.setattr(
+        llm, "chat_complete",
+        lambda system, user, **kw: prompts.append(user) or "초안",
+    )
+
+    sch = make_scholarship(content_key="k-draft", title="대상 장학금")
+    db.add(sch)
+    db.commit()
+    r = auth_client.post(
+        "/ai/draft", json={"scholarship_id": sch.id, "questions": ["지원 동기"]}
+    )
+    assert r.status_code == 200, r.text
+
+    assert prompts, "LLM 호출이 없었다"
+    sent = "\n".join(prompts)
+    assert "990101-1234567" not in sent
+    assert "010-1234-5678" not in sent
+    # 마스킹만 하고 답변 자체는 근거로 남아야 한다
+    assert "입니다" in sent
+
+
+def test_crawler_attachment_zip_bomb_is_rejected(monkeypatch):
+    """크롤러가 받는 첨부도 사용자 업로드와 같은 검사를 지나야 한다."""
+    import io
+    import zipfile
+
+    import app.utils.file_parser as fp
+
+    monkeypatch.setattr(fp, "MAX_UNCOMPRESSED_BYTES", 1024 * 1024)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("word/document.xml", b"\0" * (4 * 1024 * 1024))
+
+    with pytest.raises(fp.UnsupportedFileType):
+        fp.extract_text_from_bytes(buf.getvalue(), "attach.docx")

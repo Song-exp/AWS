@@ -26,6 +26,7 @@ from app.schemas.schemas import (
 )
 from app.services import llm
 from app.services.matching import match_scholarships
+from app.utils.pii import mask_pii
 
 _QA_SYSTEM = (
     "너는 장학금 안내 어시스턴트다. 반드시 제공된 '공고 컨텍스트' 안의 정보로만 "
@@ -118,8 +119,12 @@ def generate_draft(db: Session, user_id: uuid.UUID, scholarship_id: int, questio
         ]
         return DraftResponse(scholarship_id=scholarship_id, answers=answers, used_history=False)
 
+    # 과거 답변은 외부 LLM으로 그대로 나간다. 신청서에는 주민번호·연락처가
+    # 섞여 있을 수 있어 임베딩 때와 같은 마스킹을 거쳐 보낸다. DB의 원문은
+    # 본인이 보고 고쳐야 하므로 그대로 둔다.
     history_blob = "\n\n".join(
-        f"[문항] {d.prompt_question or '(무제)'}\n[답변] {d.content_text}" for d in history
+        f"[문항] {d.prompt_question or '(무제)'}\n[답변] {mask_pii(d.content_text)}"
+        for d in history
     )
 
     # 공고 맥락(제목/대상/지급액)을 함께 넣어 이 공고에 맞춘 초안이 되게 한다.

@@ -2,21 +2,16 @@
 
 세션은 HttpOnly 쿠키로 오간다. 프론트가 토큰을 JS로 들고 있지 않으므로
 XSS가 나도 세션이 통째로 새지 않는다.
-
-기존 익명 사용자 승계: 로그인 없는 MVP 시절 프론트는 localStorage에
-직접 만든 UUID로 자기소개서·신청서를 쌓았다. 가입할 때 그 UUID를 함께
-보내면 해당 데이터를 새 계정으로 옮긴다.
 """
 from __future__ import annotations
 
 import logging
 import os
-import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
@@ -63,8 +58,6 @@ class SignupIn(BaseModel):
     email: str
     password: str
     nickname: str | None = None
-    # 로그인 전에 이 브라우저가 쓰던 익명 UUID. 있으면 데이터를 승계한다.
-    claim_user_id: uuid.UUID | None = None
     # 개인정보 수집·이용 동의(필수). 기본값이 False라 빠뜨리면 가입이 거절된다.
     privacy_consent: bool = False
     # 마감 알림 메일 수신 동의(선택).
@@ -134,32 +127,6 @@ def _validate_credentials(email: str, password: str) -> str:
     return normalized
 
 
-def _claim_anonymous_data(db: Session, claim_id: uuid.UUID, new_id: uuid.UUID) -> int:
-    """익명 시절 데이터를 새 계정으로 옮긴다.
-
-    ponytail: 소유 증명이 'UUID를 알고 있다'뿐이다. 원래도 그 UUID를 알면
-    데이터를 읽을 수 있었으므로 노출 범위가 넓어지지는 않지만, 가져가기는
-    선착순이다. 그래서 **계정에 연결된 적 없는 UUID만** 승계를 허용한다.
-    로그인 이전 데이터를 위한 일회성 경로이므로, 기존 사용자 이전이 끝나면
-    제거하는 것이 맞다.
-    """
-    if claim_id == new_id:
-        return 0
-    owner = db.get(User, claim_id)
-    if owner is not None and owner.password_hash is not None:
-        # 이미 계정이 붙은 UUID는 남의 것이다.
-        raise HTTPException(409, "이미 계정에 연결된 데이터입니다.")
-
-    moved = 0
-    for model in (UserApplication, SavingRecord):
-        result = db.execute(
-            update(model).where(model.user_id == claim_id).values(user_id=new_id)
-        )
-        moved += result.rowcount or 0
-    db.commit()
-    return moved
-
-
 def _send_verification(user: User) -> None:
     """인증 메일 발송. 실패해도 가입은 막지 않는다(마이페이지에서 다시 보낼 수 있다)."""
     token = sign_link_token(
@@ -198,9 +165,6 @@ def signup(payload: SignupIn, response: Response, db: Session = Depends(get_db))
     db.commit()
     db.refresh(user)
     _send_verification(user)
-
-    if payload.claim_user_id:
-        _claim_anonymous_data(db, payload.claim_user_id, user.id)
 
     set_session_cookie(response, issue_session(db, user.id))
     return _to_out(user)

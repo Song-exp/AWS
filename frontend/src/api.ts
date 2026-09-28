@@ -220,7 +220,6 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
 export async function signup(
   email: string,
   password: string,
-  claimUserId: string | null | undefined,
   consent: { privacy: boolean; reminders: boolean }
 ): Promise<AuthUser> {
   const res = await authRequest("/auth/signup", {
@@ -228,8 +227,6 @@ export async function signup(
     password,
     privacy_consent: consent.privacy,
     reminder_opt_in: consent.reminders,
-    // 로그인 도입 전 이 브라우저에 쌓인 데이터를 새 계정으로 승계한다.
-    claim_user_id: claimUserId ?? null,
   });
   if (!res.ok) throw new Error(await readError(res, "가입에 실패했습니다."));
   return (await res.json()) as AuthUser;

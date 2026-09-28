@@ -356,10 +356,7 @@ export default function App() {
 
   if (!user) {
     return (
-      <AuthPage
-        claimUserId={profile?.userId ?? null}
-        onAuthenticated={handleAuthenticated}
-      />
+      <AuthPage onAuthenticated={handleAuthenticated} />
     );
   }
 

@@ -107,9 +107,14 @@ def test_summary_uses_session_not_supplied_user_id(client):
     assert s["month_saved"] == 0
 
 
-# ---------------- 익명 데이터 승계 ----------------
-def test_signup_claims_anonymous_data(client, db):
-    """로그인 도입 전 localStorage UUID로 쌓인 데이터를 계정으로 옮긴다."""
+# ---------------- 익명 데이터 승계(제거됨) ----------------
+def test_signup_ignores_legacy_claim_field(client, db):
+    """가입 시 남의 UUID를 보내도 데이터가 따라오지 않아야 한다.
+
+    로그인 도입 전 localStorage UUID로 쌓인 데이터를 승계하던 경로가 있었다.
+    소유 증명이 'UUID를 안다'뿐이라, 남은 데이터가 없어진 뒤 경로를 지웠다.
+    되살아나면 남의 신청서를 가져갈 수 있으므로 여기서 막아 둔다.
+    """
     import uuid as _uuid
 
     from app.models.application import ApplicationSource, UserApplication
@@ -123,24 +128,12 @@ def test_signup_claims_anonymous_data(client, db):
     db.commit()
 
     client.cookies.clear()
-    r = client.post("/auth/signup", json={"privacy_consent": True, 
+    r = client.post("/auth/signup", json={
+        "privacy_consent": True,
         "email": A[0], "password": A[1], "claim_user_id": str(anon),
     })
-    assert r.status_code == 201
-
-    rows = client.get("/applications").json()
-    assert [x["scholarship_name"] for x in rows] == ["익명 시절 신청서"]
-
-
-def test_cannot_claim_data_already_owned_by_an_account(client, db):
-    """이미 계정이 붙은 UUID는 가로챌 수 없어야 한다."""
-    alice_id = _signup(client, A)
-
-    client.cookies.clear()
-    r = client.post("/auth/signup", json={"privacy_consent": True, 
-        "email": B[0], "password": B[1], "claim_user_id": alice_id,
-    })
-    assert r.status_code == 409
+    assert r.status_code == 201          # 모르는 필드는 무시된다
+    assert client.get("/applications").json() == []
 
 
 def test_self_intro_is_one_document_and_editable_by_owner_only(client):

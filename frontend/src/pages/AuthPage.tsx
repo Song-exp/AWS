@@ -3,14 +3,12 @@ import { login, requestPasswordReset, signup } from "../api";
 import type { AuthUser } from "../types";
 
 interface Props {
-  /** 로그인 이전 이 브라우저가 쓰던 익명 UUID. 가입 시 데이터를 승계한다. */
-  claimUserId: string | null;
   onAuthenticated: (user: AuthUser) => void;
 }
 
 const MIN_PASSWORD_LENGTH = 8;
 
-export default function AuthPage({ claimUserId, onAuthenticated }: Props) {
+export default function AuthPage({ onAuthenticated }: Props) {
   const [mode, setMode] = useState<"login" | "signup" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +43,7 @@ export default function AuthPage({ claimUserId, onAuthenticated }: Props) {
         return;
       }
       const user = isSignup
-        ? await signup(email, password, claimUserId, {
+        ? await signup(email, password, {
             privacy: agreePrivacy,
             reminders: wantReminders,
           })
@@ -161,12 +159,6 @@ export default function AuthPage({ claimUserId, onAuthenticated }: Props) {
               마이페이지에서 언제든 끌 수 있어요.
             </p>
           </div>
-        )}
-
-        {isSignup && claimUserId && (
-          <p className="auth-hint">
-            이 기기에 저장된 기존 기록을 새 계정으로 옮겨드릴게요.
-          </p>
         )}
 
         {error && (
