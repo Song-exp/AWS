@@ -40,6 +40,7 @@ from app.models.community import (
 from app.models.store import SPEND_LABELS, SpendCategory
 from app.models.user import User
 from app.services.tier import compute_tier
+from app.utils.upload import read_limited
 
 router = APIRouter(
     prefix="/community",
@@ -540,12 +541,11 @@ async def upload_post_images(
         raise HTTPException(400, f"이미지는 글당 {MAX_IMAGES_PER_POST}장까지 올릴 수 있어요.")
 
     # 전부 검사한 뒤에 저장한다. 중간에 실패하면 반쪽만 붙지 않게.
-    limit = settings.max_upload_mb * 1024 * 1024
     staged: list[tuple[str, bytes]] = []
     for f in files:
-        content = await f.read()
-        if len(content) > limit:
-            raise HTTPException(413, f"이미지가 너무 큽니다(최대 {settings.max_upload_mb}MB).")
+        content = await read_limited(
+            f, f"이미지가 너무 큽니다(최대 {settings.max_upload_mb}MB)."
+        )
         ext = _sniff_image(content[:16])
         if ext is None:
             raise HTTPException(415, "JPG·PNG·GIF·WEBP 이미지만 올릴 수 있어요.")

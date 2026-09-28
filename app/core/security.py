@@ -43,8 +43,9 @@ def require_admin(x_admin_token: str = Header(default="")) -> None:
         if settings.is_production:  # 방어적 이중화: 여기까지 오면 설정 사고다
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "ADMIN_TOKEN 미설정")
         return
-    # 타이밍 공격 방지를 위해 상수시간 비교
-    if not hmac.compare_digest(x_admin_token, expected):
+    # 타이밍 공격 방지를 위해 상수시간 비교. 바이트로 비교하는 이유는 헤더에
+    # 비ASCII 문자가 오면 str 비교가 TypeError 를 던져 500이 나기 때문이다.
+    if not hmac.compare_digest(x_admin_token.encode(), expected.encode()):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "관리자 토큰이 올바르지 않습니다.")
 
 
@@ -53,13 +54,35 @@ def require_admin(x_admin_token: str = Header(default="")) -> None:
 # 실효 상한은 N배가 된다. 정확한 전역 상한이 필요해지면 Redis 토큰버킷으로 교체.
 _HITS: dict[str, deque[float]] = defaultdict(deque)
 _WINDOW_SEC = 60.0
+# 키는 요청자 IP와 이메일에서 온다. 상한이 없으면 서로 다른 값을 계속 보내
+# 메모리를 채울 수 있다. 넘치면 만료된 항목부터 버린다.
+_MAX_KEYS = 50_000
+
+
+def _trim_hit_keys(now: float) -> None:
+    if len(_HITS) <= _MAX_KEYS:
+        return
+    for key, hits in list(_HITS.items()):
+        if not hits or now - hits[-1] > _WINDOW_SEC:
+            del _HITS[key]
+    # 전부 살아 있으면(대량 동시 공격) 오래된 쪽부터 버린다.
+    if len(_HITS) > _MAX_KEYS:
+        for key, _ in sorted(_HITS.items(), key=lambda kv: kv[1][-1])[
+            : len(_HITS) - _MAX_KEYS
+        ]:
+            del _HITS[key]
 
 
 def _client_key(request: Request) -> str:
-    # 프록시/로드밸런서 뒤에 있으면 X-Forwarded-For 의 첫 홉이 실제 클라이언트다.
+    """요청자 식별자. 위조할 수 없는 값만 쓴다.
+
+    X-Forwarded-For 는 **맨 뒤**를 본다. 앞쪽은 클라이언트가 직접 써넣을 수 있어
+    그걸 믿으면 헤더 한 줄로 상한을 무력화할 수 있다. 맨 뒤는 바로 앞 프록시가
+    덧붙인 값이다(배포에서는 Caddy 가 실제 접속 IP로 덮어쓴다. Caddyfile 참고).
+    """
     fwd = request.headers.get("x-forwarded-for", "")
     if fwd:
-        return fwd.split(",")[0].strip()
+        return fwd.rsplit(",", 1)[-1].strip()
     return request.client.host if request.client else "unknown"
 
 
@@ -71,6 +94,7 @@ def rate_limit_chat(request: Request) -> None:
 
     key = _client_key(request)
     now = time.monotonic()
+    _trim_hit_keys(now)
     hits = _HITS[key]
     while hits and now - hits[0] > _WINDOW_SEC:
         hits.popleft()
@@ -388,6 +412,33 @@ def current_user(request: Request, db: Session = Depends(get_db)):
     return user
 
 
+def rate_limit_login(email: str) -> None:
+    """한 계정에 대한 로그인 시도 상한.
+
+    IP 기준 상한만 두면 IP를 바꿔가며 한 계정을 계속 두드릴 수 있다. 배포에서는
+    프록시를 거쳐 IP가 뭉치기도 해서, 계정 기준 상한이 실질적인 방어선이다.
+    상한에 걸려도 계정을 잠그지는 않는다. 잠그면 남의 계정을 일부러 잠그는
+    괴롭힘이 가능해진다.
+    """
+    limit = settings.auth_rate_limit_per_min
+    if limit <= 0:
+        return
+    key = "login:" + email
+    now = time.monotonic()
+    _trim_hit_keys(now)
+    hits = _HITS[key]
+    while hits and now - hits[0] > _WINDOW_SEC:
+        hits.popleft()
+    if len(hits) >= limit:
+        retry_after = int(_WINDOW_SEC - (now - hits[0])) + 1
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            f"시도가 너무 잦습니다. {retry_after}초 후 다시 시도해 주세요.",
+            headers={"Retry-After": str(retry_after)},
+        )
+    hits.append(now)
+
+
 def rate_limit_auth(request: Request) -> None:
     """로그인·가입 시도 상한. 비밀번호 무차별 대입을 늦춘다."""
     limit = settings.auth_rate_limit_per_min
@@ -395,6 +446,7 @@ def rate_limit_auth(request: Request) -> None:
         return
     key = "auth:" + _client_key(request)
     now = time.monotonic()
+    _trim_hit_keys(now)
     hits = _HITS[key]
     while hits and now - hits[0] > _WINDOW_SEC:
         hits.popleft()
@@ -438,7 +490,7 @@ def read_link_token(purpose: str, token: str) -> tuple[uuid.UUID, str] | None:
     """서명·용도·만료를 확인하고 (user_id, email)을 돌려준다. 아니면 None."""
     payload, _, sig = token.partition(".")
     try:
-        if not sig or not hmac.compare_digest(sig, _sign(payload)):
+        if not sig or not hmac.compare_digest(sig.encode(), _sign(payload).encode()):
             return None
         raw = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)).decode("utf-8")
         got_purpose, uid, exp, email = raw.split("|", 3)
@@ -447,5 +499,6 @@ def read_link_token(purpose: str, token: str) -> tuple[uuid.UUID, str] | None:
         if int(exp) and int(exp) <= int(datetime.now(timezone.utc).timestamp()):
             return None
         return uuid.UUID(uid), email
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError, TypeError):
+        # 잘못된 토큰은 400으로 돌려줘야 한다. 여기서 예외가 새면 500이 난다.
         return None

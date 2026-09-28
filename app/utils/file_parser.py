@@ -12,6 +12,21 @@ class UnsupportedFileType(Exception):
     pass
 
 
+#: 압축을 풀었을 때 허용하는 최대 크기. hwpx·docx 는 zip 이라 10MB 파일이 수 GB로
+#: 부풀 수 있다(압축 폭탄). 그러면 워커가 메모리 부족으로 죽어 서비스가 멈춘다.
+MAX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
+
+
+def _guard_zip_size(zf) -> None:
+    """압축을 풀기 전에 원본 크기 합계를 먼저 본다."""
+    total = sum(info.file_size for info in zf.infolist())
+    if total > MAX_UNCOMPRESSED_BYTES:
+        raise UnsupportedFileType(
+            f"파일이 너무 큽니다(압축을 풀면 {total // (1024 * 1024)}MB). "
+            "내용을 줄여 다시 올려주세요."
+        )
+
+
 def extract_text(file_path: str) -> str:
     """확장자에 따라 적절한 파서로 라우팅."""
     ext = os.path.splitext(file_path)[1].lower()
@@ -80,6 +95,7 @@ def _extract_hwpx(file_path: str) -> str:
     import zipfile
 
     with zipfile.ZipFile(file_path) as zf:
+        _guard_zip_size(zf)
         return _hwpx_text_from_zip(zf)
 
 
@@ -88,6 +104,7 @@ def _extract_hwpx_bytes(content: bytes) -> str:
     import zipfile
 
     with zipfile.ZipFile(io.BytesIO(content)) as zf:
+        _guard_zip_size(zf)
         return _hwpx_text_from_zip(zf)
 
 
@@ -214,7 +231,13 @@ def _extract_pdf(file_path: str) -> str:
 
 
 def _extract_docx(file_path: str) -> str:
+    import zipfile
+
     import docx  # python-docx
+
+    # docx 도 zip 이다. python-docx 에 넘기기 전에 크기를 먼저 본다.
+    with zipfile.ZipFile(file_path) as zf:
+        _guard_zip_size(zf)
 
     document = docx.Document(file_path)
     return "\n".join(p.text for p in document.paragraphs).strip()

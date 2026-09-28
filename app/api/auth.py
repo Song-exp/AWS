@@ -38,6 +38,7 @@ from app.core.security import (
     issue_session,
     normalize_email,
     rate_limit_auth,
+    rate_limit_login,
     revoke_session,
     set_session_cookie,
     verify_password,
@@ -208,6 +209,10 @@ def signup(payload: SignupIn, response: Response, db: Session = Depends(get_db))
 @router.post("/login", response_model=UserOut, dependencies=_BRUTE_FORCE_GUARD)
 def login(payload: LoginIn, response: Response, db: Session = Depends(get_db)) -> UserOut:
     email = normalize_email(payload.email)
+    # IP 기준 상한(라우터 의존성)에 더해 계정 기준으로도 센다. IP를 바꿔가며
+    # 한 계정만 두드리는 경우를 막는다. 계정을 잠그지는 않는다. 잠그면 남의
+    # 계정을 일부러 잠그는 괴롭힘이 가능해진다.
+    rate_limit_login(email)
     user = db.scalar(select(User).where(User.email == email))
 
     # 이메일이 없을 때와 비밀번호가 틀렸을 때의 응답을 구분하지 않는다.

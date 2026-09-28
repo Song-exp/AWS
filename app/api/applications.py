@@ -20,6 +20,7 @@ from app.models.application import (
 )
 from app.schemas.schemas import ApplicationCreate, ApplicationOut
 from app.utils.file_parser import UnsupportedFileType, extract_text
+from app.utils.upload import read_limited
 
 # 전부 개인 데이터다. 라우터 수준에서 로그인을 강제한다.
 router = APIRouter(
@@ -42,9 +43,7 @@ async def upload_application(
     safe_name = f"{uuid.uuid4().hex}_{os.path.basename(file.filename or 'upload')}"
     dest = os.path.join(settings.upload_dir, safe_name)
 
-    content = await file.read()
-    if len(content) > settings.max_upload_mb * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="파일이 너무 큽니다.")
+    content = await read_limited(file)
     with open(dest, "wb") as f:
         f.write(content)
 

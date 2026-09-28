@@ -5,12 +5,19 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
-from app.core.security import current_user
+from app.core.security import current_user, rate_limit_chat
 from app.models.user import User
 from app.schemas.schemas import DraftRequest, DraftResponse, QARequest, QAResponse
 from app.services import rag
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+# 두 엔드포인트 모두 외부 LLM을 호출한다. 로그인과 호출 상한을 라우터 단위로
+# 건다. 빠뜨리면 계정 없는 사람이 LLM 비용을 무한히 쓰고, 호출이 워커를
+# 점유해 서비스가 멈춘다(워커는 1개다).
+router = APIRouter(
+    prefix="/ai",
+    tags=["ai"],
+    dependencies=[Depends(current_user), Depends(rate_limit_chat)],
+)
 
 
 @router.post("/qa", response_model=QAResponse)

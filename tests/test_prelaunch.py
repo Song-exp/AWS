@@ -325,3 +325,122 @@ def test_rejected_upload_leaves_no_file(auth_client):
     assert r.status_code == 415
     after = set(os.listdir(settings.upload_dir))
     assert after - before == set()
+
+
+# ---------------- 남용 방지 (보안 검토 대응) ----------------
+def test_forged_forwarded_for_cannot_reset_the_counter(client, db, monkeypatch):
+    """X-Forwarded-For 앞쪽은 클라이언트가 써넣을 수 있다.
+
+    그 값을 믿으면 헤더 한 줄로 로그인 상한이 사라져 비밀번호를 무한히
+    시도할 수 있다.
+    """
+    from app.core.config import settings
+    from app.core.security import _reset_rate_limit
+
+    _signup(client)
+    _reset_rate_limit()
+    monkeypatch.setattr(settings, "auth_rate_limit_per_min", 3)
+    client.cookies.clear()
+
+    codes = [
+        client.post(
+            "/auth/login",
+            json={"email": EMAIL, "password": f"wrong-{i}"},
+            headers={"X-Forwarded-For": f"10.0.0.{i}"},  # 매번 다른 위조 IP
+        ).status_code
+        for i in range(6)
+    ]
+    assert 429 in codes, codes
+
+
+def test_login_limit_is_per_account_too(client, monkeypatch):
+    """IP를 바꿔가며 한 계정만 두드리는 경우도 막아야 한다."""
+    from app.core.config import settings
+    from app.core.security import _reset_rate_limit
+
+    _signup(client)
+    _reset_rate_limit()
+    monkeypatch.setattr(settings, "auth_rate_limit_per_min", 3)
+    client.cookies.clear()
+
+    # 상한을 넘긴 뒤 다른 계정으로는 여전히 시도할 수 있어야 한다.
+    for i in range(5):
+        client.post("/auth/login", json={"email": EMAIL, "password": f"w-{i}"})
+    blocked = client.post("/auth/login", json={"email": EMAIL, "password": "w"})
+    assert blocked.status_code == 429
+    _reset_rate_limit()
+    other = client.post(
+        "/auth/login", json={"email": "someone-else@khu.ac.kr", "password": "w"}
+    )
+    assert other.status_code == 401
+
+
+def test_ai_endpoints_require_login(client):
+    """두 엔드포인트 모두 유료 LLM을 호출한다. 계정 없이 열려 있으면 비용이 샌다."""
+    for path, body in (
+        ("/ai/qa", {"question": "장학금 알려줘"}),
+        ("/ai/draft", {"scholarship_id": 1, "questions": ["q"]}),
+    ):
+        assert client.post(path, json=body).status_code == 401, path
+
+
+def test_non_ascii_token_returns_400_not_500(client):
+    """잘못된 토큰은 400이어야 한다. 여기서 예외가 새면 500이 난다."""
+    for path in ("/auth/email/verify", "/auth/reminders/unsubscribe"):
+        r = client.post(path, json={"token": "abc.아"})
+        assert r.status_code == 400, (path, r.status_code)
+
+
+def test_non_ascii_admin_token_returns_401_not_500():
+    """FastAPI 는 헤더를 latin-1 로 디코딩한다. 그 문자열을 그대로 비교하면
+    TypeError 가 나서 500이 된다. 여기서는 401이어야 한다.
+
+    테스트 클라이언트가 비ASCII 헤더를 실어 보내지 못하므로 함수를 직접 부른다.
+    """
+    from fastapi import HTTPException
+
+    from app.core.security import require_admin
+
+    with pytest.raises(HTTPException) as e:
+        require_admin(x_admin_token="토큰".encode().decode("latin-1"))
+    assert e.value.status_code == 401
+
+
+def test_oversized_upload_is_cut_off(auth_client, monkeypatch):
+    """상한을 넘는 본문은 전부 읽지 않고 끊어야 한다. 읽으면 메모리가 터진다."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "max_upload_mb", 1)
+    big = b"x" * (2 * 1024 * 1024)
+    r = auth_client.post("/chat/upload", files={"file": ("big.txt", big, "text/plain")})
+    assert r.status_code == 413, r.status_code
+
+
+def test_zip_bomb_is_rejected(tmp_path, monkeypatch):
+    """10MB 파일이 수 GB로 부푸는 압축 폭탄을 파싱하면 워커가 죽는다."""
+    import zipfile
+
+    import app.utils.file_parser as fp
+
+    monkeypatch.setattr(fp, "MAX_UNCOMPRESSED_BYTES", 1024 * 1024)
+    bomb = tmp_path / "bomb.hwpx"
+    with zipfile.ZipFile(bomb, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("Contents/section0.xml", b"\0" * (4 * 1024 * 1024))
+    assert bomb.stat().st_size < 1024 * 1024  # 압축 상태로는 작다
+
+    with pytest.raises(fp.UnsupportedFileType):
+        fp.extract_text(str(bomb))
+
+
+def test_real_user_data_in_data_dir_is_gitignored():
+    """DB 백업과 업로드 백업이 git add 한 번에 공개되면 안 된다."""
+    import subprocess
+
+    for path in (
+        "data/app.db",
+        "data/app.db.pre-crawl-20260928",
+        "data/backup-before-account-wipe-20260922/app.db",
+        "data/uploads/x.pdf",
+    ):
+        r = subprocess.run(["git", "check-ignore", path], capture_output=True)
+        assert r.returncode == 0, f"{path} 가 .gitignore 에 걸리지 않는다"

@@ -21,8 +21,11 @@ venv/
 *.key
 
 # Data / uploads
+# 실제 사용자 데이터다. '*.db' 만 두면 app.db.pre-crawl-20260928 같은 백업이
+# 걸러지지 않아 git add -A 한 번에 공개된다.
 /data/uploads/
-/data/*.db
+/data/*.db*
+/data/backup-*/
 
 # IDE & OS
 .vscode/

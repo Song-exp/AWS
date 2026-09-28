@@ -1,13 +1,12 @@
-{
-	servers {
-		# ponytail: 모든 출발지의 X-Forwarded-For 를 신뢰한다. Vercel 리라이트를 거친
-		# 요청의 실제 클라이언트 IP를 살려야 rate limit 이 사용자별로 동작한다.
-		# 백엔드 도메인에 직접 붙으면 헤더를 위조할 수 있으니, 악용이 보이면
-		# Vercel IP 대역만 신뢰하도록 좁힌다.
-		trusted_proxies static 0.0.0.0/0 ::/0
-	}
-}
-
+# 클라이언트가 보낸 X-Forwarded-For 를 신뢰하지 않고 실제 접속 IP로 덮어쓴다.
+# 신뢰하면 헤더 한 줄로 rate limit 을 무력화할 수 있다(로그인 무차별 대입,
+# LLM 비용 폭주, 카운터 메모리 증가).
+#
+# Vercel 리라이트를 거친 요청은 이 값이 Vercel 엣지 IP가 된다. 그래서 상한이
+# IP별이 아니라 엣지별로 걸릴 수 있다. 계정별 상한(app/core/security.py 의
+# rate_limit_login)이 그 몫을 맡는다.
 {$DOMAIN} {
-	reverse_proxy backend:8000
+	reverse_proxy backend:8000 {
+		header_up X-Forwarded-For {remote_host}
+	}
 }

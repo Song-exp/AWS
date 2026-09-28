@@ -21,6 +21,7 @@ from app.models.application import (
 from app.services import chat as chat_service
 from app.services import indexing
 from app.utils.file_parser import UnsupportedFileType, extract_text
+from app.utils.upload import read_limited
 
 router = APIRouter(
     prefix="/chat",
@@ -93,9 +94,7 @@ async def upload_in_chat(
     safe_name = f"{uuid.uuid4().hex}_{original}"
     dest = os.path.join(settings.upload_dir, safe_name)
 
-    content = await file.read()
-    if len(content) > settings.max_upload_mb * 1024 * 1024:
-        raise HTTPException(status_code=413, detail=f"파일이 너무 큽니다(최대 {settings.max_upload_mb}MB).")
+    content = await read_limited(file)
     with open(dest, "wb") as f:
         f.write(content)
 
