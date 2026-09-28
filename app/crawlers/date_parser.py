@@ -1,8 +1,8 @@
-"""비정형 마감일 표기를 정규화하고, MVP의 '8월 마감' 필터를 적용한다.
+"""비정형 마감일 표기를 정규화한다.
 
 한국 공고는 '2026.8.31', '8/31(월) 18:00', '8월 말', '~8.31' 등
 표기가 제각각이다. 규칙 기반 파서로 최대한 커버하고, 실패 시 None을
-반환해 상위에서 status='needs_review'로 격리하도록 한다.
+반환한다(상위 파이프라인의 '마감일 없는 공고' 규칙을 따른다).
 """
 from __future__ import annotations
 
@@ -29,11 +29,16 @@ def _last_day_of_month(year: int, month: int) -> int:
     return (nxt - timedelta(days=1)).day
 
 
-def normalize_deadline(text: str, default_year: int = 2026) -> datetime | None:
+def normalize_deadline(text: str, default_year: int | None = None) -> datetime | None:
     """마감일 문자열을 KST tz-aware datetime으로 정규화. 실패 시 None."""
     if not text:
         return None
     text = text.strip()
+    # 기간 표기('9.1 ~ 9.30')면 끝 날짜만 본다. 끝이 잘렸으면('8.10 ~') 알 수 없다.
+    if "~" in text:
+        text = text.rsplit("~", 1)[1]
+    if default_year is None:
+        default_year = datetime.now(KST).year
 
     # 시간 파싱(없으면 23:59)
     tmatch = _TIME.search(text)
@@ -67,41 +72,3 @@ def normalize_deadline(text: str, default_year: int = 2026) -> datetime | None:
         return datetime.combine(date(year, month, day), time(hh, mm), tzinfo=KST)
     except ValueError:
         return None
-
-
-def is_within_august(dt: datetime | None, year: int = 2026) -> bool:
-    """(하위호환) 특정 연-8월 마감 판정. 신규 코드는 is_within_months 사용."""
-    return is_within_months(dt, {(year, 8)})
-
-
-def target_year_months(
-    base: date | datetime | None = None, months_ahead: int = 1
-) -> set[tuple[int, int]]:
-    """기준일의 당월부터 months_ahead 개월 후까지 (연, 월) 집합 반환.
-
-    예) base=2026-08, months_ahead=1 -> {(2026,8),(2026,9)}
-        base=2026-12, months_ahead=1 -> {(2026,12),(2027,1)}  # 연 경계 처리
-    """
-    if base is None:
-        base = datetime.now(KST)
-    if isinstance(base, datetime):
-        base = base.date()
-
-    result: set[tuple[int, int]] = set()
-    year, month = base.year, base.month
-    for _ in range(months_ahead + 1):
-        result.add((year, month))
-        month += 1
-        if month > 12:
-            month = 1
-            year += 1
-    return result
-
-
-def is_within_months(
-    dt: datetime | None, year_months: set[tuple[int, int]]
-) -> bool:
-    """마감일이 대상 (연, 월) 집합에 속하는지 판정."""
-    if dt is None:
-        return False
-    return (dt.year, dt.month) in year_months

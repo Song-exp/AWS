@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { fetchMyPage, fetchSavingsSummary } from "../api";
+import { fetchMyPage, fetchSavingsSummary, updateApplicationDocuments } from "../api";
 import { DEMO_PERSONAS, getPersonaForProfile } from "../personas";
 import AccountSettings from "../components/AccountSettings";
-import type { AuthUser, MyPageData, SavingSummary, UserProfileLocal } from "../types";
+import { useNavState } from "../useNavState";
+import type { AuthUser, MyApplication, MyPageData, SavingSummary, UserProfileLocal } from "../types";
 
 interface Props {
   profile: UserProfileLocal | null;
@@ -35,9 +36,10 @@ export default function MyPage({ profile, user, onSignedOut }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [savings, setSavings] = useState<SavingSummary | null>(null);
-  const [tab, setTab] = useState<
+  // 하위 탭 이동도 뒤로가기로 되돌아온다.
+  const [tab, setTab] = useNavState<
     "savings" | "applications" | "documents" | "cards" | "account"
-  >("savings");
+  >("mypage", "savings");
 
   useEffect(() => {
     if (!profile) {
@@ -66,6 +68,16 @@ export default function MyPage({ profile, user, onSignedOut }: Props) {
   if (error) return <div className="mypage"><p className="notice error">{error}</p></div>;
   if (!data) return null;
 
+  // 수정 저장 후 두 탭(신청 기록·자기소개서)이 같은 데이터를 보도록 목록에서 바꿔 끼운다.
+  const replaceApplication = (saved: MyApplication) =>
+    setData((current) =>
+      current && {
+        ...current,
+        applications: current.applications.map((x) => (x.id === saved.id ? saved : x)),
+      }
+    );
+  // 자기소개서 1편 = 신청서 1건의 문항 답변 전부. 문항을 따로따로 보여주지 않는다.
+  const selfIntros = data.applications.filter((a) => a.is_reusable && a.documents.length > 0);
   const selectedPersona = getPersonaForProfile(profile);
   const genderLabel = selectedPersona.gender === "male" ? "남성" : "여성";
   const character = selectedPersona.gender === "male"
@@ -154,61 +166,32 @@ export default function MyPage({ profile, user, onSignedOut }: Props) {
             <p className="notice">아직 신청 기록이 없어요. 챗봇에서 장학금을 찾아 지원서를 저장해보세요.</p>
           ) : (
             data.applications.map((a) => (
-              <details key={a.id} className="mypage-card mypage-detail-card">
-                <summary>
-                  <div className="mypage-card-top">
-                    <strong>{a.scholarship_name}</strong>
-                    <span className={`badge ${a.result}`}>{RESULT_LABELS[a.result] ?? a.result}</span>
-                  </div>
+              <SelfIntroCard
+                key={a.id}
+                application={a}
+                onSaved={replaceApplication}
+                badge={<span className={`badge ${a.result}`}>{RESULT_LABELS[a.result] ?? a.result}</span>}
+                meta={
                   <p className="mypage-meta">
                     {a.organization ?? "기관 미상"} · {SOURCE_LABELS[a.source] ?? a.source}
                     {a.created_at ? ` · ${a.created_at.slice(0, 10)}` : ""}
                   </p>
-                  <div className="mypage-detail-footer">
-                    <span className="mypage-doc-count">문서 {a.documents.length}건</span>
-                    <span className="mypage-detail-action" aria-hidden="true">내용 보기</span>
-                  </div>
-                </summary>
-                <div className="mypage-detail-content">
-                  {a.documents.length === 0 ? (
-                    <p className="notice">이 신청 기록에는 저장된 문서 내용이 없어요.</p>
-                  ) : (
-                    a.documents.map((d, index) => (
-                      <section key={d.id} className="mypage-document-section">
-                        <div className="mypage-document-heading">
-                          <strong>{d.prompt_question ?? `첨부 문서 ${index + 1}`}</strong>
-                          <span>{d.char_count.toLocaleString("ko-KR")}자</span>
-                        </div>
-                        <p className="mypage-full-text">{d.content_text || "저장된 내용이 없어요."}</p>
-                      </section>
-                    ))
-                  )}
-                </div>
-              </details>
+                }
+              />
             ))
           )
         )}
 
         {tab === "documents" && (
-          data.documents.length === 0 ? (
+          selfIntros.length === 0 ? (
             <p className="notice">저장된 자기소개서가 없어요. 신청서를 업로드하거나 작성하면 여기 모입니다.</p>
           ) : (
-            data.documents.map((d) => (
-              <details key={d.id} className="mypage-card mypage-detail-card">
-                <summary>
-                  <div className="mypage-card-top">
-                    <strong>{d.prompt_question ?? "첨부 자기소개서"}</strong>
-                    <span className="badge">{d.char_count.toLocaleString("ko-KR")}자</span>
-                  </div>
-                  <p className="mypage-doc-text">{d.content_text.slice(0, 200)}{d.content_text.length > 200 ? "…" : ""}</p>
-                  <div className="mypage-detail-footer">
-                    <span className="mypage-detail-action" aria-hidden="true">전체 내용 보기</span>
-                  </div>
-                </summary>
-                <div className="mypage-detail-content">
-                  <p className="mypage-full-text">{d.content_text || "저장된 내용이 없어요."}</p>
-                </div>
-              </details>
+            selfIntros.map((a) => (
+              <SelfIntroCard
+                key={a.id}
+                application={a}
+                onSaved={replaceApplication}
+              />
             ))
           )
         )}
@@ -297,5 +280,115 @@ export default function MyPage({ profile, user, onSignedOut }: Props) {
         </div>
       </section>
     </div>
+  );
+}
+
+/** 자기소개서 한 편. 펼치면 문항 전체를 이어서 읽고, 수정하면 한 번에 저장한다. */
+function SelfIntroCard({
+  application,
+  onSaved,
+  badge,
+  meta,
+}: {
+  application: MyApplication;
+  onSaved: (saved: MyApplication) => void;
+  /** 없으면 총 글자 수를 배지로 보여준다. */
+  badge?: React.ReactNode;
+  /** 제목 아래 한 줄(기관·출처·날짜 등). 없으면 본문 미리보기를 보여준다. */
+  meta?: React.ReactNode;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [texts, setTexts] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const docs = application.documents;
+  const totalChars = docs.reduce((sum, d) => sum + d.char_count, 0);
+  const preview = docs.map((d) => d.content_text).join(" ");
+
+  function startEdit() {
+    setTexts(docs.map((d) => d.content_text));
+    setError(null);
+    setEditing(true);
+  }
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      const saved = await updateApplicationDocuments(
+        application.id,
+        docs.map((d, i) => ({ id: d.id, content_text: texts[i] }))
+      );
+      onSaved(saved);
+      setEditing(false);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <details className="mypage-card mypage-detail-card">
+      <summary>
+        <div className="mypage-card-top">
+          <strong>{application.scholarship_name}</strong>
+          {badge ?? <span className="badge">{totalChars.toLocaleString("ko-KR")}자</span>}
+        </div>
+        {meta ?? (
+          <p className="mypage-doc-text">{preview.slice(0, 200)}{preview.length > 200 ? "…" : ""}</p>
+        )}
+        <div className="mypage-detail-footer">
+          <span className="mypage-doc-count">
+            문항 {docs.length}개{badge ? ` · ${totalChars.toLocaleString("ko-KR")}자` : ""}
+          </span>
+          <span className="mypage-detail-action" aria-hidden="true">전체 내용 보기</span>
+        </div>
+      </summary>
+      <div className="mypage-detail-content">
+        {docs.length === 0 && (
+          <p className="notice">이 신청 기록에는 저장된 문서 내용이 없어요.</p>
+        )}
+        {docs.map((d, index) => (
+          <section key={d.id} className="mypage-document-section">
+            <div className="mypage-document-heading">
+              <strong>{d.prompt_question ?? `문항 ${index + 1}`}</strong>
+              <span>{(editing ? texts[index].length : d.char_count).toLocaleString("ko-KR")}자</span>
+            </div>
+            {editing ? (
+              <textarea
+                className="mypage-edit-text"
+                aria-label={`${d.prompt_question ?? `문항 ${index + 1}`} 답변`}
+                value={texts[index]}
+                maxLength={20000}
+                onChange={(e) =>
+                  setTexts((current) => current.map((t, i) => (i === index ? e.target.value : t)))
+                }
+              />
+            ) : (
+              <p className="mypage-full-text">{d.content_text || "저장된 내용이 없어요."}</p>
+            )}
+          </section>
+        ))}
+        {error && <p className="notice error">{error}</p>}
+        {docs.length > 0 && <div className="mypage-edit-actions">
+          {editing ? (
+            <>
+              <button type="button" className="location-button" onClick={() => setEditing(false)} disabled={saving}>
+                취소
+              </button>
+              <button type="button" className="primary-button" onClick={save} disabled={saving}>
+                {saving ? "저장 중…" : "저장"}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="location-button" onClick={startEdit}>
+              수정
+            </button>
+          )}
+        </div>}
+      </div>
+    </details>
   );
 }

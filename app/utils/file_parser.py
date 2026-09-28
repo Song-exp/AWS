@@ -118,11 +118,91 @@ def _extract_hwp_bytes(content: bytes) -> str:
         return ""
     ole = olefile.OleFileIO(io.BytesIO(content))
     try:
-        if ole.exists("PrvText"):
-            return ole.openstream("PrvText").read().decode("utf-16-le", errors="ignore").strip()
-        return ""
+        return _hwp_text(ole)
     finally:
         ole.close()
+
+
+#: HWP 레코드 태그: 문단 텍스트
+_HWPTAG_PARA_TEXT = 67
+#: 8 wchar를 차지하는 인라인·확장 제어문자(탭·표·그림 등). 나머지 0~31은 1 wchar.
+_HWP_WIDE_CTRL = {1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23}
+
+
+def _hwp_para_text(buf: bytes) -> str:
+    """PARA_TEXT 레코드(UTF-16LE) -> 문자열. 제어문자는 건너뛰거나 공백으로 바꾼다."""
+    import struct
+
+    out = bytearray()
+    i, end = 0, len(buf) - len(buf) % 2
+    while i < end:
+        (ch,) = struct.unpack_from("<H", buf, i)
+        if ch >= 32:
+            out += buf[i:i + 2]
+            i += 2
+        elif ch in _HWP_WIDE_CTRL:
+            if ch == 9:
+                out += "\t".encode("utf-16-le")
+            i += 16
+        else:
+            out += ("\n" if ch in (10, 13) else " ").encode("utf-16-le")
+            i += 2
+    return out.decode("utf-16-le", errors="ignore")
+
+
+def _hwp_section_text(data: bytes) -> str:
+    """압축 해제된 BodyText/SectionN 스트림에서 문단 텍스트를 모은다.
+
+    레코드 헤더(uint32): 태그 10비트 | 레벨 10비트 | 크기 12비트(0xFFF면 다음 uint32).
+    """
+    import struct
+
+    paras: list[str] = []
+    pos = 0
+    while pos + 4 <= len(data):
+        (header,) = struct.unpack_from("<I", data, pos)
+        pos += 4
+        tag, size = header & 0x3FF, header >> 20
+        if size == 0xFFF:
+            (size,) = struct.unpack_from("<I", data, pos)
+            pos += 4
+        if tag == _HWPTAG_PARA_TEXT:
+            text = _hwp_para_text(data[pos:pos + size]).strip()
+            if text:
+                paras.append(text)
+        pos += size
+    return "\n".join(paras)
+
+
+def _hwp_text(ole) -> str:
+    """HWP 5.x 본문 텍스트. 읽지 못하면 PrvText(미리보기)로 폴백한다.
+
+    PrvText는 앞부분 약 1,000자에서 잘려 뒤쪽의 마감일·자격이 빠진다.
+    배포용 문서(ViewText, 암호화)는 본문을 못 읽으므로 미리보기만 남는다.
+    """
+    import struct
+    import zlib
+
+    try:
+        props = struct.unpack_from("<I", ole.openstream("FileHeader").read(), 36)[0]
+        sections = sorted(
+            (e for e in ole.listdir() if len(e) == 2 and e[0] == "BodyText"),
+            key=lambda e: int(e[1].removeprefix("Section")),
+        )
+        parts = []
+        for entry in sections:
+            data = ole.openstream(entry).read()
+            if props & 1:  # 압축 문서
+                data = zlib.decompress(data, -15)
+            parts.append(_hwp_section_text(data))
+        text = "\n".join(p for p in parts if p).strip()
+    except Exception:  # noqa: BLE001 - 구조가 예상과 다르면 미리보기로 폴백
+        text = ""
+    if text:
+        return text
+    if ole.exists("PrvText"):
+        return ole.openstream("PrvText").read().decode("utf-16-le", errors="ignore").strip()
+    return ""
 
 
 def _extract_pdf(file_path: str) -> str:
@@ -141,12 +221,7 @@ def _extract_docx(file_path: str) -> str:
 
 
 def _extract_hwp(file_path: str) -> str:
-    """HWP는 순수 파이썬 지원이 제한적이다.
-
-    한글(HWP) 5.x는 OLE 복합문서로, 'PrvText' 스트림에 미리보기 텍스트가
-    UTF-16LE로 저장되어 있어 이를 우선 추출한다. 완전한 본문 추출은
-    후속 개선 대상(예: hwp5 CLI 연동)으로 남긴다.
-    """
+    """한글(HWP) 5.x는 OLE 복합문서다. 본문 레코드를 직접 읽는다(_hwp_text)."""
     import olefile
 
     if not olefile.isOleFile(file_path):
@@ -154,9 +229,6 @@ def _extract_hwp(file_path: str) -> str:
 
     ole = olefile.OleFileIO(file_path)
     try:
-        if ole.exists("PrvText"):
-            data = ole.openstream("PrvText").read()
-            return data.decode("utf-16-le", errors="ignore").strip()
-        return ""  # 본문 추출은 후속 개선
+        return _hwp_text(ole)
     finally:
         ole.close()

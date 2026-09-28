@@ -141,3 +141,32 @@ def test_cannot_claim_data_already_owned_by_an_account(client, db):
         "email": B[0], "password": B[1], "claim_user_id": alice_id,
     })
     assert r.status_code == 409
+
+
+def test_self_intro_is_one_document_and_editable_by_owner_only(client):
+    _signup(client, A)
+    app = client.post("/applications", json={
+        "scholarship_name": "앨리스 장학금",
+        "documents": [
+            {"prompt_question": "지원 동기", "content_text": "처음 동기"},
+            {"prompt_question": "학업 계획", "content_text": "처음 계획"},
+        ],
+    }).json()
+    # 문항이 둘이어도 자기소개서는 한 편으로 센다.
+    assert client.get("/me/summary").json()["counts"]["documents"] == 1
+
+    first, second = app["documents"]
+    r = client.put(f"/me/applications/{app['id']}/documents", json={
+        "documents": [{"id": first["id"], "content_text": "고친 동기"},
+                      {"id": second["id"], "content_text": "처음 계획"}],
+    })
+    assert r.status_code == 200, r.text
+    texts = [d["content_text"] for d in r.json()["documents"]]
+    assert texts == ["고친 동기", "처음 계획"]
+    assert r.json()["documents"][0]["char_count"] == len("고친 동기")
+
+    _signup(client, B)
+    r = client.put(f"/me/applications/{app['id']}/documents", json={
+        "documents": [{"id": first["id"], "content_text": "남이 고침"}],
+    })
+    assert r.status_code == 404

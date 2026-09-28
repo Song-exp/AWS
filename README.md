@@ -12,7 +12,7 @@ app/                    백엔드(FastAPI)
   core/    설정 · DB세션 · 방언독립 타입(SQLite/PostgreSQL 전환)
   models/  scholarship · application · crawl_run · store · card · user
   api/     stores · meta · me · chat · scholarships · ai · applications · admin
-  crawlers/ 공공/민간 어댑터 · 월간 파이프라인
+  crawlers/ 온통청년 API · 경희대 장학공지 · 일간 파이프라인
   services/ matching · rag · chat(상태머신) · indexing · llm(DeepSeek) · scheduler
   scripts/ init_all 및 개별 데이터 시드
 frontend/               프론트(React + Vite + TS)
@@ -38,8 +38,8 @@ Copy-Item .env.example .env       # DEEPSEEK_API_KEY 등 채우기
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 # http://localhost:8000/docs
 ```
-`init_all`의 장학금 모드는 `sample`(기본, 외부 통신 없음), `crawl`, `skip`이다. 크롤 대상 월은
-`--month 2026-08 --month 2026-09`처럼 반복 지정할 수 있다. 각 시드는 upsert 방식이라 재실행해도 중복되지 않는다.
+`init_all`의 장학금 모드는 `sample`(기본, 외부 통신 없음), `crawl`, `skip`이다. `crawl`은 일간 파이프라인을
+한 번 실행한다(`YOUTHCENTER_API_KEY` 필요). 각 시드는 upsert 방식이라 재실행해도 중복되지 않는다.
 
 로컬 기본 DB는 **SQLite**(`data/app.db`)로 별도 설치가 필요 없다. 배포 시 `DATABASE_URL`을
 PostgreSQL로 바꾸면 pgvector 벡터 검색까지 활성화된다.
@@ -132,7 +132,7 @@ $env:TEST_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/test"
 | POST | `/applications/upload` | 과거 신청서 업로드(→텍스트 추출) |
 | POST | `/applications` | 작성 신청서 저장(플라이휠) |
 | POST | `/ai/qa` · `/ai/draft` | 근거 기반 Q&A · 초안 생성 |
-| POST | `/admin/crawl/run` · GET `/admin/crawl/runs` | 월간 크롤 수동 실행·이력 (**`X-Admin-Token` 필요**) |
+| POST | `/admin/crawl/run` · GET `/admin/crawl/runs` | 일간 크롤(마감 삭제+신규 수집) 수동 실행·이력 (**`X-Admin-Token` 필요**) |
 | POST | `/admin/index/run` | 임베딩 인덱싱 (**`X-Admin-Token` 필요**) |
 | GET | `/health` | liveness(프로세스 생존) |
 | GET | `/ready` | readiness(DB 확인, 실패 시 503) |
@@ -168,7 +168,7 @@ $env:TEST_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/test"
 - **회원 탈퇴**: 계정·신청서·자기소개서·절감기록을 실제로 삭제하고 업로드 원본 파일도
   지운다. 소프트 삭제로 남기지 않는다 — 과거 신청서에 주민번호·학번·성적이 섞여 있을 수
   있어 보관 자체가 위험이다.
-- **세션 정리**: 만료·폐기된 세션 행과 쓴 재설정 토큰은 월간 스케줄러가 함께 청소한다.
+- **세션 정리**: 만료·폐기된 세션 행과 쓴 재설정 토큰은 일간 스케줄러가 함께 청소한다.
 
 ### 비밀번호 재설정
 
@@ -233,13 +233,17 @@ $env:TEST_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/test"
 - `user_applications` × `application_documents` — 과거·생성 신청서(문항 단위). 쓸수록 초안 품질이 오르는 플라이휠.
 - `users` — 공통 프로필 테이블. 현재 프론트 프로필은 `localStorage(paypick.profile.v1)`로 관리한다.
 
-## 월간 크롤링 파이프라인
-매월 1일 04:00 KST에 APScheduler가 실행한다: 만료 공고 `closed` → 당월+익월 크롤 →
-`content_key` 멱등 upsert → `CrawlRun` 이력 기록. 현재 경희대 장학공지와 드림스폰이 실제 동작하며,
-온통청년은 API 키 승인 후 연동 예정이다.
+## 일간 크롤링 파이프라인
+매일 00:10 KST(날짜가 바뀐 직후)에 APScheduler가 실행한다(`CRAWL_SCHEDULE_*`, 서버 프로세스 안에서 동작).
+1. 마감일이 지난 공고 삭제. 신청 이력은 공고명 스냅샷이 남고 연결만 끊긴다.
+2. 온통청년 청년정책 API: 모집중 전체를 받아 upsert하고, 목록에서 빠진 정책은 삭제한다.
+   신청기간 끝 날짜(상시는 사업 종료일)가 마감일이며, 신청기간구분 `0057003`(마감)은 받지 않는다.
+3. 경희대 장학공지: 직전 성공 실행 이후 올라온 새 글만 본문·첨부(hwpx/hwp/pdf/docx 전부)를 받아
+   DeepSeek로 마감일·자격·지급액을 뽑는다. 마감일을 못 뽑은 글은 등록 후 45일 동안만 둔다.
+   본문이 이미지뿐이고 텍스트 첨부가 없으면 마감일을 알 수 없다(OCR 미적용).
+4. `CrawlRun` 이력 기록. 수동 실행은 `POST /admin/crawl/run`.
 
 ## 미구현/후속(TODO)
-- 청년정책 API 연동 및 무용한 KOSAF 보관뉴스 크롤러 교체
 - 매장별·기간별 실제 프로모션 데이터 수집(현재 간편결제 시드는 동일 할인율 예시)
 - 사용자 인증과 localStorage 프로필의 서버 이전
 - Alembic 마이그레이션, 마감 리마인더 알림

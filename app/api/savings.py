@@ -20,7 +20,8 @@ from app.core.db import get_db
 from app.core.security import current_user
 from app.models.user import User
 from app.models.saving import SavingKind, SavingRecord
-from app.models.store import Store
+from app.models.store import SPEND_LABELS, STORE_TO_SPEND, SpendCategory, Store
+from app.services.tier import TierOut, compute_tier
 
 # 절감 이력은 개인 데이터다. 전부 로그인을 요구한다.
 router = APIRouter(
@@ -66,6 +67,9 @@ class SpendIn(BaseModel):
 
     store_id: int | None = None
     store_label: str = ""
+    # 매장이 없는 절감(교통 정액권·구독 전환·지원금)은 분야를 직접 준다.
+    # 매장이 있으면 업종에서 유도하므로 비워도 된다.
+    category: SpendCategory | None = None
     original_amount: float = Field(gt=0, description="할인 전 결제 예정 금액(원)")
     final_amount: float = Field(ge=0, description="실제 결제 금액(원)")
     method_label: str = Field(default="", description="'네이버페이 10%' 등 사용한 수단")
@@ -76,12 +80,15 @@ class ViewIn(BaseModel):
 
     store_id: int | None = None
     store_label: str = ""
+    category: SpendCategory | None = None
 
 
 class SavingOut(BaseModel):
     id: int
     kind: str
     store_label: str
+    category: SpendCategory | None = None
+    category_label: str | None = None
     original_amount: float
     final_amount: float
     saved_amount: float
@@ -95,6 +102,13 @@ class RewardOut(BaseModel):
     message: str        # '이번 달 학식 5그릇 값 세이브 완료!'
 
 
+class CategorySavingOut(BaseModel):
+    category: SpendCategory | None = None
+    label: str
+    saved: float
+    count: int
+
+
 class SummaryOut(BaseModel):
     user_id: str
     month: str                  # '2026-09'
@@ -104,6 +118,9 @@ class SummaryOut(BaseModel):
     viewed_count: int           # 이번 달 혜택 조회 건수
     conversion_rate: float      # 소비완료 / 조회 (KPI 목표 0.25)
     reward: RewardOut | None = None
+    tier: TierOut | None = None
+    # 이번 달 분야별 절감. 대시보드가 '어디서 아꼈나'를 보여주는 축이다.
+    by_category: list[CategorySavingOut] = []
     recent: list[SavingOut] = []
 
 
@@ -133,6 +150,8 @@ def _to_out(r: SavingRecord) -> SavingOut:
         id=r.id,
         kind=r.kind.value if hasattr(r.kind, "value") else str(r.kind),
         store_label=r.store_label,
+        category=r.category,
+        category_label=SPEND_LABELS.get(r.category) if r.category else None,
         original_amount=r.original_amount,
         final_amount=r.final_amount,
         saved_amount=r.saved_amount,
@@ -155,16 +174,23 @@ def record_spend(
         )
 
     label = payload.store_label
-    if not label and payload.store_id:
+    category = payload.category
+    if payload.store_id:
         store = db.get(Store, payload.store_id)
         if store:
-            label = f"{store.brand} {store.branch}"
+            if not label:
+                label = f"{store.brand} {store.branch}"
+            # 지도에서 온 기록은 업종이 분야를 결정한다. 클라이언트가
+            # 분야를 안 보내도 대시보드가 비지 않게 서버에서 채운다.
+            if category is None:
+                category = STORE_TO_SPEND.get(store.category)
 
     row = SavingRecord(
         user_id=user.id,
         kind=SavingKind.SPENT,
         store_id=payload.store_id,
         store_label=label,
+        category=category,
         original_amount=payload.original_amount,
         final_amount=payload.final_amount,
         saved_amount=round(payload.original_amount - payload.final_amount, 2),
@@ -187,6 +213,7 @@ def record_view(
         SavingRecord(
             user_id=user.id,
             kind=SavingKind.VIEWED,
+            category=payload.category,
             store_id=payload.store_id,
             store_label=payload.store_label,
         )
@@ -219,6 +246,33 @@ def summary(
     total_saved, _ = _agg(SavingKind.SPENT, None)
     _, viewed_count = _agg(SavingKind.VIEWED, start)
 
+    by_cat_rows = db.execute(
+        select(
+            SavingRecord.category,
+            func.coalesce(func.sum(SavingRecord.saved_amount), 0.0),
+            func.count(SavingRecord.id),
+        )
+        .where(
+            SavingRecord.user_id == user_id,
+            SavingRecord.kind == SavingKind.SPENT,
+            SavingRecord.created_at >= start,
+        )
+        .group_by(SavingRecord.category)
+    ).all()
+    by_category = sorted(
+        (
+            CategorySavingOut(
+                category=cat,
+                label=SPEND_LABELS.get(cat, "기타") if cat else "기타",
+                saved=round(float(amount), 2),
+                count=cnt,
+            )
+            for cat, amount, cnt in by_cat_rows
+        ),
+        key=lambda c: c.saved,
+        reverse=True,
+    )
+
     recent = db.scalars(
         select(SavingRecord)
         .where(SavingRecord.user_id == user_id, SavingRecord.kind == SavingKind.SPENT)
@@ -236,5 +290,7 @@ def summary(
         # 조회가 0이면 전환율은 정의되지 않는다. 0으로 두어 UI가 나누기를 하지 않게 한다.
         conversion_rate=round(month_count / viewed_count, 4) if viewed_count else 0.0,
         reward=_reward_for(float(month_saved)),
+        tier=compute_tier(db, user_id),
+        by_category=by_category,
         recent=[_to_out(r) for r in recent],
     )

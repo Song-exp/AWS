@@ -1,6 +1,6 @@
 """크롤링 실행 이력 모델.
 
-월간 파이프라인이 실행될 때마다 1건을 기록해 성공/실패·수집 건수·
+일간 파이프라인이 실행될 때마다 1건을 기록해 성공/실패·수집 건수·
 플랫폼별 리포트를 추적한다(운영 모니터링·디버깅 근거).
 """
 from __future__ import annotations
@@ -33,8 +33,11 @@ class CrawlRun(Base):
     )
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # 이번 실행이 대상으로 삼은 (연,월) 목록. 예: [[2026,8],[2026,9]]
+    # 미사용: 월간 파이프라인 시절의 대상 (연,월) 목록. 일간 전환 후 항상 [].
     target_months: Mapped[list] = mapped_column(JSONType, default=list)
+
+    # 게시판 소스는 per_platform 에 skipped=False 로 남은 마지막 실행 날짜 이후
+    # 올라온 글만 새 글로 본다(registry._last_success_date).
 
     total_fetched: Mapped[int] = mapped_column(Integer, default=0)
     total_saved: Mapped[int] = mapped_column(Integer, default=0)

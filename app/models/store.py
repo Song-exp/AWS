@@ -49,6 +49,45 @@ class StoreCategory(str, enum.Enum):
     OTHER = "other"
 
 
+class SpendCategory(str, enum.Enum):
+    """지출 분야. 매장 업종(StoreCategory)과 다른 축이다.
+
+    StoreCategory는 '지도에 찍히는 가게가 무엇인가'이고, SpendCategory는
+    '돈이 어디로 나가는가'다. 교통·고정비처럼 좌표가 없는 지출은 매장
+    업종으로는 표현되지 않으므로 축을 따로 둔다.
+    """
+
+    FOOD = "food"            # 식비(편의점·카페·음식점·마트·학식)
+    TRANSPORT = "transport"  # 교통(통학·시외이동)
+    CULTURE = "culture"      # 문화·여가(영화·공연·구독)
+    STUDY = "study"          # 학업(교재·인강·학생팩)
+    LIVING = "living"        # 생활·쇼핑(H&B·생필품)
+    FIXED = "fixed"          # 고정비(주거·통신)
+    FINANCE = "finance"      # 금융·수입(장학금·지원금·인센티브)
+
+
+#: 매장 업종 -> 지출 분야. 지도에서 생긴 절감 기록에 분야를 채울 때 쓴다.
+STORE_TO_SPEND: dict[StoreCategory, SpendCategory] = {
+    StoreCategory.CONVENIENCE: SpendCategory.FOOD,
+    StoreCategory.CAFE: SpendCategory.FOOD,
+    StoreCategory.RESTAURANT: SpendCategory.FOOD,
+    StoreCategory.MART: SpendCategory.FOOD,
+    StoreCategory.BAKERY: SpendCategory.FOOD,
+    StoreCategory.HNB: SpendCategory.LIVING,
+    StoreCategory.OTHER: SpendCategory.LIVING,
+}
+
+SPEND_LABELS: dict[SpendCategory, str] = {
+    SpendCategory.FOOD: "식비",
+    SpendCategory.TRANSPORT: "교통",
+    SpendCategory.CULTURE: "문화·여가",
+    SpendCategory.STUDY: "학업",
+    SpendCategory.LIVING: "생활·쇼핑",
+    SpendCategory.FIXED: "고정비",
+    SpendCategory.FINANCE: "금융·수입",
+}
+
+
 class Store(Base):
     """매장(편의점·카페·음식점·마트 등)."""
 

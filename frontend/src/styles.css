@@ -1235,6 +1235,25 @@ button:disabled { cursor: default; opacity: 0.5; }
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+/* 자기소개서 수정: 읽기 글씨와 같은 크기·줄간격으로 바꿔 쓰는 느낌을 준다. */
+.mypage-edit-text {
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fffaf9;
+  color: #374151;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.8;
+  resize: vertical;
+}
+.mypage-edit-text:focus { border-color: var(--accent); outline: none; }
+.mypage-edit-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.mypage-detail-content > .notice { margin: 14px 0 0; }
 .badge { padding: 3px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 9px; font-weight: 800; }
 .badge.accepted { background: #dcfce7; color: #15803d; }
 .badge.rejected { background: #fee2e2; color: #b91c1c; }

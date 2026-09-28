@@ -5,7 +5,7 @@
 통합 서비스:
   - 페이픽(지도): 주변 편의점 간편결제 할인 (/stores)
   - 장학금 챗봇: 매칭·초안·아카이빙 (/chat, /scholarships, /ai, /applications)
-월간 크롤 스케줄러를 lifespan에서 start/stop 한다.
+일간 크롤 스케줄러(매일 00:10 KST)를 lifespan에서 start/stop 한다.
 """
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from app.api import (
     ai,
     applications,
     auth,
+    benefits,
     community,
     me,
     meta,
@@ -75,8 +76,10 @@ app.include_router(applications.router)
 app.include_router(scholarships.router)
 app.include_router(ai.router)
 app.include_router(savings.router)
+app.include_router(benefits.router)
 app.include_router(community.router)
 app.include_router(admin.router)
+app.include_router(admin.offer_report_router)
 app.include_router(chat_api.router)
 app.include_router(chat_api.index_router)
 

@@ -1,33 +1,170 @@
-"""공공기관(정부 혜택) 어댑터.
-
-MVP에서는 인터페이스와 수집 흐름만 스캐폴딩한다. 실제 셀렉터/엔드포인트는
-Day 0 소스 실사 후 채운다. 공공데이터는 대체로 재사용 우호적이지만,
-각 포털의 이용약관을 개별 확인한다.
-"""
+"""공공 소스 어댑터: 온통청년 청년정책 API, 경희대 장학공지 게시판."""
 from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timedelta, timezone
 
-from app.crawlers.base import BaseCrawler, RawPosting
+from app.core.config import settings
+from app.crawlers.base import BaseCrawler, ComplianceError, RawPosting
 from app.models.scholarship import Category, SourceType
 
 logger = logging.getLogger(__name__)
 
+KST = timezone(timedelta(hours=9))
+
+# 시군구 코드 앞 2자리 -> 시도. 특별자치도 전환 후 코드(강원 51, 전북 52)도 둔다.
+_SIDO_BY_PREFIX = {
+    "11": "서울", "26": "부산", "27": "대구", "28": "인천", "29": "광주",
+    "30": "대전", "31": "울산", "36": "세종", "41": "경기", "42": "강원",
+    "43": "충북", "44": "충남", "45": "전북", "46": "전남", "47": "경북",
+    "48": "경남", "50": "제주", "51": "강원", "52": "전북",
+}
+_ALL_SIDO = set(_SIDO_BY_PREFIX.values())
+# 전남광주통합특별시 출범으로 광주·전남이 앞자리 12를 공유한다(API 실측).
+# 프로필은 여전히 광주/전남으로 나뉘므로 광주 자치구 코드만 따로 가른다.
+_GWANGJU_CODES = {"12210", "12240", "12270", "12300", "12330"}
+
+
+def _sido(code: str) -> str | None:
+    if code.startswith("12"):
+        return "광주" if code in _GWANGJU_CODES else "전남"
+    return _SIDO_BY_PREFIX.get(code[:2])
+
+
+def _regions_from_zip(zip_cd: str) -> list[str]:
+    """'41111,41113,...' -> ['경기']. 17개 시도를 다 덮으면 ['전국']."""
+    regions = {s for z in (zip_cd or "").split(",") if (s := _sido(z.strip()))}
+    if regions == _ALL_SIDO:
+        return ["전국"]
+    return sorted(regions)
+
+
+def _parse_kst(text: str | None, fmt: str) -> datetime | None:
+    try:
+        return datetime.strptime((text or "").strip(), fmt).replace(tzinfo=KST)
+    except ValueError:
+        return None
+
 
 class OnjungchoungnyeonCrawler(BaseCrawler):
-    """온통청년(청년포털) - 청년정책/지원금."""
+    """온통청년 청년정책 Open API(getPlcy).
+
+    신청기간구분(aplyPrdSeCd)별 처리(2026-09 전체 2,773건 실측):
+      - 0057001 특정기간: 신청기간(aplyYmd 'YYYYMMDD ~ YYYYMMDD') 끝 날짜가 마감일
+      - 0057002 상시: 신청기간이 비어 있다. 사업기간 종료일(bizPrdEndYmd)이 있으면
+        그날을 마감일로, 없으면('연중', '사업비 소진 시 조기 마감') 마감일 없이 둔다
+      - 0057003 마감: 신청기간이 비었고 제목에 '[9월 마감]', '[소진 마감]' 등이
+        붙는다. 수집하지 않는다
+    모집중 전체를 매번 받으므로(full_sync) 목록에서 빠진 정책은 상위에서 삭제된다.
+    """
 
     platform = "onjungchoungnyeon"
     source_type = SourceType.PUBLIC
     category = Category.GOV_BENEFIT
-    base_url = "https://www.youthcenter.go.kr"
-    tos_allows_crawling = False  # Day 0 실사 후 True로 전환
+    tos_allows_crawling = True  # 공식 Open API
+    full_sync = True
+
+    api_url = "https://www.youthcenter.go.kr/go/ythip/getPlcy"
+    detail_url = "https://www.youthcenter.go.kr/youthPolicy/ythPlcyTotalSearch/ythPlcyDetail"
+    page_size = 500
+
+    #: 본문에 넣을 필드(라벨, 키). 매칭의 관심분야 텍스트 검색에 쓰인다.
+    _BODY_FIELDS = (
+        ("설명", "plcyExplnCn"),
+        ("지원내용", "plcySprtCn"),
+        ("신청자격", "addAplyQlfcCndCn"),
+        ("신청방법", "plcyAplyMthdCn"),
+        ("심사방법", "srngMthdCn"),
+        ("제출서류", "sbmsnDcmntCn"),
+    )
+
+    def preflight(self, respect_robots: bool = True) -> None:
+        # 공식 API라 robots.txt 대상이 아니다. 키만 확인한다.
+        if not settings.youthcenter_api_key:
+            raise ComplianceError(f"[{self.platform}] YOUTHCENTER_API_KEY 미설정")
+
+    def _to_raw(self, item: dict) -> RawPosting | None:
+        name = (item.get("plcyNm") or "").strip()
+        plcy_no = item.get("plcyNo")
+        if not name or not plcy_no or item.get("aplyPrdSeCd") == "0057003":
+            return None
+
+        # 신청 마감일, 없으면(상시) 사업 종료일
+        m = re.search(r"~\s*(\d{8})", item.get("aplyYmd") or "")
+        end = m.group(1) if m else (item.get("bizPrdEndYmd") or "").strip()
+        deadline = _parse_kst(end, "%Y%m%d") if end else None
+        if deadline:
+            deadline = deadline.replace(hour=23, minute=59)
+
+        regions = _regions_from_zip(item.get("zipCd") or "")
+        body = "\n".join(
+            f"[{label}] {item[key].strip()}"
+            for label, key in self._BODY_FIELDS
+            if (item.get(key) or "").strip()
+        )
+
+        return RawPosting(
+            title=name,
+            source_url=f"{self.detail_url}/{plcy_no}",
+            source_platform=self.platform,
+            source_type=self.source_type,
+            category=Category.SCHOLARSHIP if "장학" in name else Category.GOV_BENEFIT,
+            organization=item.get("sprvsnInstCdNm") or item.get("operInstCdNm") or None,
+            deadline_raw=end or None,  # 변경 감지 해시에 마감일 변경이 잡히게
+            deadline_at=deadline,
+            posted_at=_parse_kst(item.get("frstRegDt"), "%Y-%m-%d %H:%M:%S"),
+            eligibility={"region": regions} if regions else {},
+            body_text=body,
+        )
 
     def fetch(self) -> list[RawPosting]:
-        # TODO(Day1-3): 공공데이터 Open API 우선 탐색, 없으면 목록 파싱.
-        # 반환 예시 형태만 문서화하고 실제 수집은 미구현.
-        return []
+        import time
+
+        import httpx
+
+        results: list[RawPosting] = []
+        received = total = 0
+        with httpx.Client(timeout=30) as client:
+            page = 1
+            while True:
+                resp = client.get(
+                    self.api_url,
+                    params={
+                        "apiKeyNm": settings.youthcenter_api_key,
+                        "pageNum": page,
+                        "pageSize": self.page_size,
+                        "rtnType": "json",
+                    },
+                )
+                # raise_for_status 메시지에는 키가 든 URL이 찍히므로 직접 만든다.
+                if resp.status_code != 200:
+                    raise RuntimeError(f"youthcenter HTTP {resp.status_code}")
+                payload = resp.json()
+                if payload.get("resultCode") != 200:
+                    raise RuntimeError(f"youthcenter resultCode={payload.get('resultCode')}")
+
+                data = payload.get("result") or {}
+                items = data.get("youthPolicyList") or []
+                received += len(items)
+                results.extend(r for r in map(self._to_raw, items) if r)
+
+                total = (data.get("pagging") or {}).get("totCount", 0)
+                if not items or page * self.page_size >= total:
+                    break
+                page += 1
+                time.sleep(settings.crawl_default_delay_sec)
+
+        # 목록에서 빠진 정책은 삭제되므로, 덜 받은 채로 동기화하면 멀쩡한 공고가 지워진다.
+        if received < total:
+            raise RuntimeError(f"youthcenter incomplete: {received}/{total}")
+        return results
+
+
+#: 본문 텍스트를 뽑을 수 있는 첨부 확장자
+_TEXT_EXTS = (".hwpx", ".hwp", ".pdf", ".docx", ".txt")
+#: 신청서 양식류 첨부. 구조화 추출은 본문 앞부분만 읽으므로 모집요강 뒤로 보낸다.
+_FORM_HINTS = ("서식", "양식", "신청서", "지원서", "동의서", "추천서")
 
 
 class KhuScholarshipCrawler(BaseCrawler):
@@ -39,12 +176,11 @@ class KhuScholarshipCrawler(BaseCrawler):
     목록 구조(확인됨):
         tr > td(구분) / td(카테고리: 공통_교외장학|공통_교내장학) / td(제목)
              / td(첨부) / td(등록일 YYYY-MM-DD)
-        상세는 view.do?menuNo=..&boardId=.. (GET 가능)
+        상세는 view.do?menuNo=..&boardId=.. (GET 가능), 본문은 div.bbs-view_c
 
-    주의: 이 게시판은 **목록에 마감일이 없다**(본문이 HWPX 첨부에 있음).
-    그래서 deadline_at은 제목에서 찾을 수 있을 때만 채우고, 대신
-    posted_at(등록일)을 기록해 상위 파이프라인이 '최근 등록=모집중'으로
-    판단하게 한다.
+    목록에는 마감일이 없다. fetch()는 목록(제목·등록일)만 가져오고, 상위
+    파이프라인이 새 글에 한해 fetch_detail()로 본문·첨부를 받아 마감일을 뽑는다.
+    제목에 마감 표기가 있으면 그것을 먼저 쓴다.
     """
 
     platform = "khu_janghak"
@@ -57,53 +193,67 @@ class KhuScholarshipCrawler(BaseCrawler):
     menu_no = "12300032"
     max_pages = 3
     user_agent = "ScholarshipMVP/0.1 (+research; respects robots)"
-    #: 첨부(HWPX/PDF)를 열어 본문까지 수집할 상위 건수. 요청 수를 제한한다.
-    enrich_detail_count = 12
 
-    def _fetch_attachment_text(self, client, detail_url: str) -> tuple[str, str | None]:
-        """상세 페이지의 첫 첨부를 내려받아 텍스트를 추출. (본문, 첨부파일명)."""
-        from bs4 import BeautifulSoup
+    def fetch_detail(self, raw: RawPosting) -> None:
+        """상세 본문 HTML 텍스트 + 텍스트 첨부 전부를 body_text에 붙인다.
 
-        from app.utils.file_parser import UnsupportedFileType, extract_text_from_bytes
-
-        try:
-            r = client.get(detail_url)
-            if r.status_code != 200 or "에러안내" in r.text:
-                return "", None
-            soup = BeautifulSoup(r.text, "lxml")
-            # 텍스트 추출 가능한 첨부(hwpx/hwp/pdf/docx)를 우선 선택
-            chosen_href, chosen_name = None, None
-            for a in soup.select('a[href*="fileDown"]'):
-                nm = " ".join(a.get_text(" ", strip=True).split())
-                if nm.lower().endswith((".hwpx", ".hwp", ".pdf", ".docx", ".txt")):
-                    chosen_href, chosen_name = a.get("href") or "", nm
-                    break
-            if chosen_href is None:
-                return "", None
-            dl = chosen_href if chosen_href.startswith("http") else f"{self.base_url}{chosen_href}"
-            fr = client.get(dl)
-            if fr.status_code != 200 or not fr.content:
-                return "", chosen_name
-            try:
-                text = extract_text_from_bytes(fr.content, chosen_name)
-            except UnsupportedFileType:
-                return "", chosen_name
-            return text, chosen_name
-        except Exception:  # noqa: BLE001 - 첨부 실패가 목록 수집을 막지 않게
-            logger.warning("khu attachment fetch failed: %s", detail_url)
-            return "", None
-
-    def fetch(self) -> list[RawPosting]:
-        import time as _time
-        from datetime import datetime, time as dtime, timedelta, timezone
+        첨부는 전부 읽는다: 첫 첨부가 신청서 양식이고 모집요강은 그 뒤인 공고가 흔하다.
+        본문이 이미지뿐이고 텍스트 첨부도 없으면 채울 것이 없다(OCR 미적용).
+        """
+        import time
 
         import httpx
         from bs4 import BeautifulSoup
 
-        from app.core.config import settings
+        from app.utils.file_parser import extract_text_from_bytes
+
+        parts: list[str] = []
+        names: list[str] = []
+        headers = {"User-Agent": self.user_agent}
+        try:
+            with httpx.Client(timeout=25, follow_redirects=True, headers=headers) as client:
+                r = client.get(raw.source_url)
+                if r.status_code != 200 or "에러안내" in r.text:
+                    return
+                soup = BeautifulSoup(r.text, "lxml")
+                view = soup.select_one("div.bbs-view_c")
+                if view:
+                    parts.append(view.get_text("\n", strip=True))
+
+                links = []
+                for a in soup.select('a[href*="fileDown"]'):
+                    nm = " ".join(a.get_text(" ", strip=True).split())
+                    if nm.lower().endswith(_TEXT_EXTS):
+                        links.append((nm, a.get("href") or ""))
+                links.sort(key=lambda link: any(h in link[0] for h in _FORM_HINTS))
+
+                for nm, href in links:
+                    time.sleep(settings.crawl_default_delay_sec)
+                    fr = client.get(href if href.startswith("http") else f"{self.base_url}{href}")
+                    if fr.status_code != 200 or not fr.content:
+                        continue
+                    try:
+                        parts.append(extract_text_from_bytes(fr.content, nm))
+                        names.append(nm)
+                    except Exception:  # noqa: BLE001 - 첨부 하나가 깨져도 나머지는 읽는다
+                        logger.warning("khu attachment parse failed: %s", nm)
+        except Exception:  # noqa: BLE001 - 상세 실패가 목록 수집을 막지 않게
+            logger.warning("khu detail fetch failed: %s", raw.source_url)
+
+        text = "\n".join(p for p in parts if p)
+        if text:
+            raw.body_text = f"{raw.body_text}\n{text}"
+        if names:
+            raw.required_documents = names
+
+    def fetch(self) -> list[RawPosting]:
+        import time as _time
+
+        import httpx
+        from bs4 import BeautifulSoup
+
         from app.crawlers.date_parser import normalize_deadline
 
-        KST = timezone(timedelta(hours=9))
         results: list[RawPosting] = []
         headers = {"User-Agent": self.user_agent}
         seen: set[str] = set()
@@ -155,7 +305,7 @@ class KhuScholarshipCrawler(BaseCrawler):
                             tzinfo=KST,
                         )
 
-                    # 제목에 마감 표기가 있으면 사용(없으면 None → posted_at으로 판단)
+                    # 제목에 마감 표기가 있으면 사용(없으면 None → 상세 본문에서 추출)
                     deadline_at = normalize_deadline(title)
 
                     detail_url = (
@@ -187,98 +337,5 @@ class KhuScholarshipCrawler(BaseCrawler):
                 if new_on_page == 0:
                     break
                 _time.sleep(settings.crawl_default_delay_sec)
-
-            # 상위 N건은 첨부(HWPX/PDF)를 열어 본문까지 채운다.
-            # 본문이 있으면 마감일·자격·지급액 구조화 추출의 소스가 된다.
-            for raw in results[: self.enrich_detail_count]:
-                body, fname = self._fetch_attachment_text(client, raw.source_url)
-                if body:
-                    raw.body_text = body
-                    if fname:
-                        raw.required_documents = [fname]
-                _time.sleep(settings.crawl_default_delay_sec)
-
-        return results
-
-
-class KosafCrawler(BaseCrawler):
-    """한국장학재단 - 재단뉴스/공지 게시판.
-
-    robots.txt 실사 결과 `User-agent: * Allow: /`로 크롤링이 허용됨.
-    게시판은 정적(SSR) HTML이라 httpx + BeautifulSoup로 파싱한다.
-    상세 마감일/자격이 정형 필드로 제공되지 않으므로, 목록의 제목·등록일·
-    상세링크·본문을 수집한다(파이프라인 실데이터 확보 목적).
-    """
-
-    platform = "kosaf"
-    source_type = SourceType.PUBLIC
-    category = Category.GOV_BENEFIT
-    base_url = "https://www.kosaf.go.kr"
-    tos_allows_crawling = True  # robots.txt Allow: / 확인 (2026-08 실사)
-
-    #: 수집 대상 게시판 경로(재단뉴스). 공지사항은 /ko/notice.do
-    list_path = "/ko/news.do"
-    #: 수집 페이지 수 (한 페이지 10건)
-    max_pages = 1
-    user_agent = "ScholarshipMVP/0.1 (+research; respects robots)"
-
-    def fetch(self) -> list[RawPosting]:
-        import time
-
-        import httpx
-        from bs4 import BeautifulSoup
-
-        from app.core.config import settings
-        from app.crawlers.date_parser import normalize_deadline
-
-        results: list[RawPosting] = []
-        headers = {"User-Agent": self.user_agent}
-
-        with httpx.Client(timeout=20, follow_redirects=True, headers=headers) as client:
-            for page in range(1, self.max_pages + 1):
-                url = f"{self.base_url}{self.list_path}?page={page}"
-                resp = client.get(url)
-                if resp.status_code != 200:
-                    break
-                soup = BeautifulSoup(resp.text, "lxml")
-                table = soup.select_one("div.board_list table")
-                if table is None:
-                    break
-                for tr in table.select("tbody tr"):
-                    a = tr.select_one("a")
-                    tds = tr.find_all("td")
-                    if a is None or len(tds) < 3:
-                        continue
-                    title = a.get_text(strip=True)
-                    href = a.get("href") or ""
-                    detail_url = (
-                        f"{self.base_url}{self.list_path}{href}"
-                        if href.startswith("?")
-                        else href
-                    )
-                    posted_at = tds[2].get_text(strip=True)  # 'YYYY.MM.DD' (등록일)
-
-                    # 주의: 등록일은 마감일이 아니다. 제목에서 마감 표기를 찾고,
-                    # 없으면 deadline_at을 비워 상위에서 needs_review로 격리한다.
-                    deadline = normalize_deadline(title)
-
-                    results.append(
-                        RawPosting(
-                            title=title,
-                            source_url=detail_url,
-                            source_platform=self.platform,
-                            source_type=self.source_type,
-                            category=self.category,
-                            organization="한국장학재단",
-                            deadline_raw=None,
-                            deadline_at=deadline,
-                            body_text=title,
-                            eligibility={},
-                            benefit={},
-                        )
-                    )
-                    # 등록일은 참고용으로 본문에 남긴다
-                    results[-1].body_text = f"{title}\n(등록일 {posted_at})"
-                time.sleep(settings.crawl_default_delay_sec)  # rate limit 준수
 
         return results

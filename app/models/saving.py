@@ -23,11 +23,13 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     String,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
 from app.core.types import GUIDType, PKType
+from app.models.store import SpendCategory
 
 
 class SavingKind(str, enum.Enum):
@@ -45,6 +47,13 @@ class SavingRecord(Base):
 
     kind: Mapped[SavingKind] = mapped_column(
         Enum(SavingKind, name="saving_kind"), default=SavingKind.SPENT, index=True
+    )
+
+    # 지출 분야. 매장 결제면 업종에서 유도하고, 교통·구독·지원금처럼 매장이
+    # 없는 절감은 호출부가 직접 지정한다. 이 컬럼이 없으면 store_id 에 묶여
+    # 오프라인 결제만 절감으로 잡힌다.
+    category: Mapped[SpendCategory | None] = mapped_column(
+        Enum(SpendCategory, name="spend_category"), index=True
     )
 
     # 매장은 지워질 수 있지만 절감 이력은 남아야 한다(집계가 흔들리면 안 됨).
@@ -72,4 +81,27 @@ class SavingRecord(Base):
     __table_args__ = (
         # 월간 집계: user_id + created_at 범위 조회가 주 패턴
         Index("ix_saving_user_created", "user_id", "created_at"),
+    )
+
+
+class UserBenefitCheck(Base):
+    """상시 혜택 '켰음' 표시.
+
+    항목 자체는 코드 상수(services/standing_benefits.CATALOG)라 여기엔
+    사용자별 상태만 남는다. item_key 는 그 카탈로그의 key 다.
+    """
+
+    __tablename__ = "user_benefit_checks"
+
+    id: Mapped[int] = mapped_column(PKType, primary_key=True, autoincrement=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        GUIDType, ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    item_key: Mapped[str] = mapped_column(String(60), index=True)
+    done_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "item_key", name="uq_benefit_check_user_item"),
     )

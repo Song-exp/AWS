@@ -35,6 +35,27 @@ export interface ChatRequest {
 
 // ===== 지도(TMI) =====
 export type PayMethod = "kakao" | "toss" | "naver";
+
+/** 지출 분야. 매장 업종(StoreCategory)과 다른 축이다.
+ *  업종은 '지도에 찍히는 가게가 무엇인가', 이쪽은 '돈이 어디로 나가는가'. */
+export type SpendCategory =
+  | "food"
+  | "transport"
+  | "culture"
+  | "study"
+  | "living"
+  | "fixed"
+  | "finance";
+
+export const SPEND_LABELS: Record<SpendCategory, string> = {
+  food: "식비",
+  transport: "교통",
+  culture: "문화·여가",
+  study: "학업",
+  living: "생활·쇼핑",
+  fixed: "고정비",
+  finance: "금융·수입",
+};
 export type StudentCredential = "student_card" | "student_tok";
 export type BenefitProgram = "khu_alliance" | "onnuri" | "seoulpay" | "zeropay";
 
@@ -48,6 +69,11 @@ export type StoreCategory =
   | "other";
 
 export interface Offer {
+  id: number;
+  /** '이미 끝난 혜택이에요' 제보 수 */
+  report_count: number;
+  /** 임계를 넘겨 추천에서 빠졌는가 */
+  reported: boolean;
   pay_method: PayMethod;
   discount_rate: number;
   condition_text: string | null;
@@ -254,6 +280,8 @@ export interface SavingRecord {
   id: number;
   kind: string;
   store_label: string;
+  category: SpendCategory | null;
+  category_label: string | null;
   original_amount: number;
   final_amount: number;
   saved_amount: number;
@@ -277,13 +305,32 @@ export interface SavingSummary {
   /** 소비완료 / 혜택조회. KPI 목표 0.25 */
   conversion_rate: number;
   reward: SavingReward | null;
+  tier: SavingTier | null;
+  by_category: CategorySaving[];
   recent: SavingRecord[];
+}
+
+/** 절감액 등급. 금액은 싣지 않는다 — 버킷만 내려온다. */
+export interface SavingTier {
+  index: number;
+  label: string;
+  next_label: string | null;
+  next_at: number | null;
+  demoted: boolean;
+}
+
+export interface CategorySaving {
+  category: SpendCategory | null;
+  label: string;
+  saved: number;
+  count: number;
 }
 
 export interface SpendPayload {
   user_id: string;
   store_id?: number | null;
   store_label?: string;
+  category?: SpendCategory | null;
   original_amount: number;
   final_amount: number;
   method_label?: string;
@@ -330,11 +377,17 @@ export interface PostSummary {
   title: string;
   preview: string;
   author_label: string;
+  /** 별명 글에만 실린다. 익명 글은 null */
+  author_tier: string | null;
+  category: SpendCategory | null;
+  category_label: string | null;
   is_question: boolean;
   like_count: number;
   comment_count: number;
   created_at: string | null;
   is_mine: boolean;
+  /** 첫 첨부 이미지 경로(API_BASE 기준). 없으면 null */
+  thumbnail_url: string | null;
 }
 
 export interface PostComment {
@@ -356,6 +409,10 @@ export interface PostDetail {
   title: string;
   body: string;
   author_label: string;
+  /** 별명 글에만 실린다. 익명 글은 null */
+  author_tier: string | null;
+  category: SpendCategory | null;
+  category_label: string | null;
   is_question: boolean;
   like_count: number;
   comment_count: number;
@@ -364,6 +421,8 @@ export interface PostDetail {
   scrapped_by_me: boolean;
   is_mine: boolean;
   created_at: string | null;
+  /** 첨부 이미지 경로들(API_BASE 기준) */
+  image_urls: string[];
   comments: PostComment[];
 }
 
@@ -378,3 +437,69 @@ export interface ToggleResult {
   active: boolean;
   count: number;
 }
+
+// ---------------- 혜택 탭 ----------------
+export type PostingStatus =
+  | "open"
+  | "closing_soon"
+  | "closed"
+  | "schedule_changed"
+  | "needs_review";
+
+export interface Posting {
+  id: number;
+  title: string;
+  organization: string | null;
+  category: "scholarship" | "gov_benefit";
+  source_platform: string;
+  source_url: string;
+  deadline_at: string | null;
+  posted_at: string | null;
+  status: PostingStatus;
+  benefit: Record<string, unknown>;
+  days_left: number | null;
+}
+
+export interface PostingDetail extends Posting {
+  eligibility: Record<string, unknown>;
+  required_documents: string[];
+  body_text: string;
+}
+
+export interface PostingPage {
+  items: Posting[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+/** 상시 혜택. 마감이 없고 한 번 켜면 끝난다. */
+export interface BenefitItem {
+  key: string;
+  title: string;
+  category: SpendCategory;
+  category_label: string;
+  summary: string;
+  /** 연 절감액 **추정치**. 요율은 수시로 바뀐다. */
+  saving_hint_krw: number;
+  effort_min: number;
+  credential: string | null;
+  url: string | null;
+  search_hint: string | null;
+  done: boolean;
+}
+
+export interface BenefitItemsPage {
+  items: BenefitItem[];
+  remaining_hint_krw: number;
+  remaining_count: number;
+}
+
+export interface OfferReportResult {
+  active: boolean;
+  count: number;
+  flagged: boolean;
+}
+
+/** 커뮤니티 피드(게시판이 아닌 묶음 목록). BoardListPage 를 지우면서 옮겨 왔다. */
+export type FeedKey = "me/posts" | "me/commented" | "me/scraps" | "hot" | "best";

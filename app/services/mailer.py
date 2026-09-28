@@ -69,3 +69,29 @@ def send_password_reset(to: str, reset_url: str, ttl_minutes: int) -> None:
             "링크를 쓰지 않으면 비밀번호는 그대로 유지됩니다.\n"
         ),
     )
+
+
+def send_deadline_reminder(to: str, items: list[dict]) -> None:
+    """마감 임박 공고 알림.
+
+    돈을 못 아끼는 1위 원인은 '비싸게 샀다'가 아니라 '기간이 지나서 못
+    받았다'다. 지도도 챗봇도 사용자가 먼저 열어야 동작하므로, 먼저 찾아가는
+    경로가 하나는 있어야 한다.
+
+    한 통에 모아 보낸다. 공고마다 따로 보내면 스팸으로 분류된다.
+    """
+    lines = []
+    for it in items:
+        left = it.get("days_left")
+        when = f"D-{left}" if left is not None else "마감 임박"
+        lines.append(f"  [{when}] {it['title']}\n         {it['url']}")
+
+    send_email(
+        to=to,
+        subject=f"[대학생 혜택 통합 서비스] 마감 임박 공고 {len(items)}건",
+        body=(
+            "신청 기간이 얼마 남지 않은 공고가 있습니다.\n\n"
+            + "\n".join(lines)
+            + "\n\n알림이 필요 없으면 마이페이지에서 끌 수 있습니다.\n"
+        ),
+    )

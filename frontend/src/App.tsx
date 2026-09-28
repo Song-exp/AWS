@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { installBackGuard, useNavState } from "./useNavState";
 import AuthPage from "./pages/AuthPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ChatPage from "./pages/ChatPage";
@@ -179,7 +180,8 @@ function mergeServerProfile(
 export default function App() {
   const [profile, setProfile] = useState<UserProfileLocal | null>(null);
   const [onboarding, setOnboarding] = useState(true);
-  const [tab, setTab] = useState<Tab>("map");
+  // 탭 이동은 브라우저 기록에 남겨 뒤로가기로 이전 탭에 돌아온다.
+  const [tab, setTab] = useNavState<Tab>("tab", "map", true);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   // 메일의 재설정 링크는 ?reset_token=... 으로 들어온다.
@@ -191,8 +193,11 @@ export default function App() {
   function clearResetToken() {
     setResetToken(null);
     // 토큰이 주소창·히스토리에 남지 않게 지운다.
-    window.history.replaceState({}, "", window.location.pathname);
+    window.history.replaceState(window.history.state, "", window.location.pathname);
   }
+
+  // 첫 화면에서 뒤로가기를 눌러도 앱 밖(이전 사이트)으로 나가지 않게 한다.
+  useEffect(() => installBackGuard(), []);
 
   useEffect(() => {
     const saved = loadProfile();

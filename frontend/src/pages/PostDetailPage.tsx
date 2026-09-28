@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  apiUrl,
   createComment,
   deleteComment,
   deletePost,
@@ -135,6 +136,15 @@ export default function PostDetailPage({ postId, onBack, onDeleted }: Props) {
 
         <h1>{post.title}</h1>
         <div className="post-text">{renderBody(post.body)}</div>
+        {post.image_urls.length > 0 && (
+          <div className="post-images">
+            {post.image_urls.map((url, i) => (
+              <a key={url} href={apiUrl(url)} target="_blank" rel="noreferrer">
+                <img src={apiUrl(url)} alt={`첨부 이미지 ${i + 1}`} loading="lazy" />
+              </a>
+            ))}
+          </div>
+        )}
       </article>
 
       <div className="post-actions">

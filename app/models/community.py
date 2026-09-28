@@ -29,7 +29,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
-from app.core.types import GUIDType, PKType
+from app.models.store import SpendCategory
+from app.core.types import GUIDType, JSONType, PKType
 
 
 def _now() -> datetime:
@@ -85,8 +86,15 @@ class Post(Base):
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text)
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=True)
+    # 지출 분야 태그. 게시판이 '글의 목적'(꿀팁/공동구매)이라면 이쪽은
+    # '글의 주제'(교통/식비/...)다. 게시판 2개 × 카테고리 7개로 탐색한다.
+    category: Mapped[SpendCategory | None] = mapped_column(
+        Enum(SpendCategory, name="spend_category"), index=True
+    )
     # 질문글은 목록 상단에 카드로 따로 노출된다.
     is_question: Mapped[bool] = mapped_column(Boolean, default=False)
+    # 첨부 이미지의 저장 파일명(uuid.ext). 파일은 settings.upload_dir/community 에 둔다.
+    image_names: Mapped[list] = mapped_column(JSONType, default=list)
 
     # 집계값. 매번 count(*) 하면 목록 조회가 글 수에 비례해 느려진다.
     like_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -227,6 +235,12 @@ class Report(Base):
     comment_id: Mapped[int | None] = mapped_column(
         ForeignKey("comments.id", ondelete="CASCADE")
     )
+    # 끝난 혜택 제보도 같은 그릇을 쓴다. 중복 방지·집계·관리자 조회가
+    # 커뮤니티 신고와 완전히 같은 로직이라 테이블을 나눌 이유가 없다.
+    # reason='offer_expired' 로 구분한다.
+    store_offer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("store_offers.id", ondelete="CASCADE")
+    )
     reporter_id: Mapped[uuid.UUID] = mapped_column(
         GUIDType, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
@@ -236,4 +250,5 @@ class Report(Base):
     __table_args__ = (
         UniqueConstraint("post_id", "reporter_id", name="uq_report_post"),
         UniqueConstraint("comment_id", "reporter_id", name="uq_report_comment"),
+        UniqueConstraint("store_offer_id", "reporter_id", name="uq_report_offer"),
     )

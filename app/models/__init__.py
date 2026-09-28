@@ -6,7 +6,7 @@ from app.models.application import (
     UserApplication,
 )
 from app.models.crawl_run import CrawlRun, CrawlRunStatus
-from app.models.store import PayMethod, Store, StoreCategory, StoreOffer
+from app.models.store import SpendCategory, PayMethod, Store, StoreCategory, StoreOffer
 from app.models.card import (
     BenefitType,
     Card,
@@ -29,7 +29,7 @@ from app.models.community import (
     Scrap,
 )
 from app.models.local_benefit import LocalBenefitMerchant
-from app.models.saving import SavingKind, SavingRecord
+from app.models.saving import SavingKind, SavingRecord, UserBenefitCheck
 
 __all__ = [
     # 장학금 챗봇
@@ -44,6 +44,7 @@ __all__ = [
     "Store",
     "StoreOffer",
     "StoreCategory",
+    "SpendCategory",
     "PayMethod",
     "Card",
     "CardBenefit",
@@ -52,6 +53,7 @@ __all__ = [
     "PeriodType",
     "LocalBenefitMerchant",
     "SavingRecord",
+    "UserBenefitCheck",
     "SavingKind",
     # 공통
     "User",

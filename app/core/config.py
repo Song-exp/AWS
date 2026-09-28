@@ -44,6 +44,21 @@ class Settings(BaseSettings):
     # HOT/BEST 게시판 편입 기준(공감 수). 커뮤니티가 커지면 올려야 한다.
     community_hot_like_threshold: int = 10
     community_best_like_threshold: int = 50
+    # 내 글에 이만큼 신고가 쌓이면 등급을 한 단계 내린다. 0이면 강등 없음.
+    community_report_demote_threshold: int = 5
+
+    # --- 끝난 혜택 제보 ---
+    # 이 수 이상 제보되면 지도에서 흐리게 표시하고 best_deal 추천에서 뺀다.
+    # 자동 비활성은 하지 않는다. 오탭 몇 번, 경쟁 매장 몇 번이면 정상 혜택이
+    # 사라지기 때문에 마지막 판단은 사람이 한다(GET /admin/offer-reports).
+    store_offer_report_threshold: int = 3
+
+    # --- 마감 리마인더 ---
+    # 매일 09:00 KST에 D-N 공고를 메일로 알린다. SMTP 미설정이면 로그로만 나간다.
+    deadline_reminder_enabled: bool = True
+    deadline_reminder_hour: int = 9      # KST
+    # 마감 며칠 전에 보낼지(쉼표 구분). 너무 많이 보내면 스팸이 된다.
+    deadline_reminder_days: str = "7,3,1"
 
     # --- 비밀번호 재설정 ---
     # 재설정 링크에 쓸 프론트 주소. 메일에 들어가므로 실제 접속 가능한 값이어야 한다.
@@ -86,21 +101,30 @@ class Settings(BaseSettings):
     upload_dir: str = "./data/uploads"
     max_upload_mb: int = 10
 
-    # Crawling (월간 파이프라인: 당월 + N개월 후까지 수집)
-    crawl_months_ahead: int = 1          # 당월 + 익월
+    # Crawling (일간 파이프라인)
     crawl_respect_robots: bool = True
     crawl_default_delay_sec: float = 1.5
+    # 온통청년 청년정책 Open API 키. 비우면 해당 소스는 건너뛴다.
+    youthcenter_api_key: str = ""
 
-    # 월간 스케줄러 (매월 1일 04:00 KST 기본)
+    # 일간 스케줄러 (매일 00:10 KST: 날짜가 바뀐 직후 마감 삭제 + 신규 수집)
     # ponytail: 인스턴스 내부 APScheduler라 리더 선출이 없다. 웹 인스턴스를 2대
     # 이상 띄우면 크롤이 중복 실행되므로, 스케줄러 전용 인스턴스 1대에서만
     # true로 두고 나머지는 false로 배포한다. 상시 다중화가 필요해지면
     # DB 어드바이저리 락이나 별도 워커(EventBridge/Cron)로 승격.
     crawl_schedule_enabled: bool = True
-    crawl_schedule_day: int = 1          # 매월 며칠
-    crawl_schedule_hour: int = 4         # KST 시각
-    crawl_schedule_minute: int = 0
+    crawl_schedule_hour: int = 0         # KST 시각
+    crawl_schedule_minute: int = 10
 
+
+    @property
+    def reminder_day_list(self) -> list[int]:
+        days = []
+        for part in self.deadline_reminder_days.split(","):
+            part = part.strip()
+            if part.isdigit():
+                days.append(int(part))
+        return sorted(set(days), reverse=True)
 
     @property
     def cors_origin_list(self) -> list[str]:

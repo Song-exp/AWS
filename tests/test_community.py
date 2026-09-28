@@ -14,9 +14,22 @@ B = ("bob@khu.ac.kr", "bob-password-1")
 
 @pytest.fixture()
 def boards(db):
+    """시드 후 전 게시판을 켠다.
+
+    운영 기본값은 활성 2개(절약 꿀팁·공동구매)지만, 익명 정책 분기와
+    익명 번호 로직은 코드에 그대로 남아 있다(비활성 게시판을 되살릴 여지).
+    남아 있는 로직은 계속 검증해야 하므로 이 파일은 전 게시판을 켜고 돈다.
+    시드 기본값 자체는 test_seed_* 가 따로 지킨다.
+    """
+    from sqlalchemy import select
+
+    from app.models.community import Board
     from app.scripts.seed_boards import seed_boards
 
     seed_boards()
+    for b in db.scalars(select(Board)).all():
+        b.is_active = True
+    db.commit()
     return db
 
 
@@ -443,3 +456,121 @@ def test_empty_title_or_body_rejected(client, boards):
         "board_slug": "free", "title": "", "body": "본문"}).status_code == 422
     assert client.post("/community/posts", json={
         "board_slug": "free", "title": "제목", "body": ""}).status_code == 422
+
+
+# ---------------- 시드 기본값(제품 결정) ----------------
+def test_seed_activates_only_saving_boards(client, db):
+    """기본 활성 게시판은 절약 꿀팁·공동구매 둘뿐이다.
+
+    자유·비밀·진로 게시판은 에브리타임과 콘텐츠 볼륨으로 경쟁하는 판이라
+    끄기로 했다. 지운 게 아니라 is_active 를 내린 것이므로 행은 남는다.
+    """
+    from sqlalchemy import select
+
+    from app.models.community import Board
+    from app.scripts.seed_boards import seed_boards
+
+    seed_boards()
+    active = db.scalars(select(Board).where(Board.is_active.is_(True))).all()
+    assert {b.slug for b in active} == {"saving-tips", "groupbuy"}
+    # 껐을 뿐 삭제하지 않았다
+    assert db.scalar(select(Board).where(Board.slug == "secret")) is not None
+
+
+def test_saving_tips_requires_a_name(client, db):
+    """꿀팁이 틀리면 따라한 사람이 돈을 잃는다. 익명으로 못 쓴다."""
+    from app.scripts.seed_boards import seed_boards
+
+    seed_boards()
+    _login_as(client, A)
+    r = client.post(
+        "/community/posts",
+        json={
+            "board_slug": "saving-tips",
+            "title": "CU 2+1",
+            "body": "회기점에서 되네요",
+            "is_anonymous": True,   # 요청해도 게시판 정책이 이긴다
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["author_label"] != "익명"
+
+
+def test_post_category_filters_the_list(client, boards):
+    """게시판이 '목적'이면 카테고리는 '주제'다. 2차원으로 탐색한다."""
+    _login_as(client, A)
+    _write(client, slug="saving-tips", title="지하철", category="transport")
+    _write(client, slug="saving-tips", title="편의점", category="food")
+
+    r = client.get("/community/boards/saving-tips/posts", params={"category": "transport"})
+    assert r.status_code == 200, r.text
+    items = r.json()["items"]
+    assert [i["title"] for i in items] == ["지하철"]
+    assert items[0]["category_label"] == "교통"
+
+
+def test_named_post_carries_tier_but_anonymous_does_not(client, boards):
+    """등급은 별명 글에만 실린다.
+
+    이용자가 적을 때 익명 글에 등급을 붙이면 '이 게시판의 고수는 한 명'이
+    되어 익명 번호가 무력화된다.
+    """
+    _login_as(client, A)
+    named = _write(client, slug="saving-tips", title="실명글")
+    anon = _write(client, slug="free", title="익명글", is_anonymous=True)
+
+    assert named["author_tier"] is not None
+    assert anon["author_tier"] is None
+
+
+# ---------------- 이미지 ----------------
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 32
+
+
+def test_post_images_upload_serve_and_cleanup(client, boards, tmp_path, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "upload_dir", str(tmp_path))
+    _login_as(client, A)
+    post = _write(client)
+
+    # 이미지가 아닌 파일은 이름이 .png여도 거절한다(앞머리로 판별).
+    r = client.post(
+        f"/community/posts/{post['id']}/images",
+        files=[("files", ("x.png", b"<svg/>", "image/png"))],
+    )
+    assert r.status_code == 415
+
+    r = client.post(
+        f"/community/posts/{post['id']}/images",
+        files=[("files", ("a.png", PNG, "image/png"))],
+    )
+    assert r.status_code == 200, r.text
+    url = r.json()["image_urls"][0]
+    assert client.get(url).content == PNG
+    listed = client.get("/community/boards/free/posts").json()["items"][0]
+    assert listed["thumbnail_url"] == url
+
+    # 남의 글에는 못 붙이고, 글당 4장 제한을 넘지 못한다.
+    _login_as(client, B)
+    r = client.post(
+        f"/community/posts/{post['id']}/images",
+        files=[("files", ("a.png", PNG, "image/png"))],
+    )
+    assert r.status_code == 404
+
+    _login_as(client, A)
+    r = client.post(
+        f"/community/posts/{post['id']}/images",
+        files=[("files", (f"{i}.png", PNG, "image/png")) for i in range(4)],
+    )
+    assert r.status_code == 400
+
+    # 글을 지우면 파일도 지운다.
+    assert client.delete(f"/community/posts/{post['id']}").status_code == 204
+    assert client.get(url).status_code == 404
+
+
+def test_image_route_rejects_path_tricks(client, boards):
+    _login_as(client, A)
+    assert client.get("/community/images/..%2F..%2Fapp.db").status_code == 404

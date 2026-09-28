@@ -66,8 +66,11 @@ class BaseCrawler(abc.ABC):
     `tos_allows_crawling`을 명시적으로 선언하도록 강제한다.
     """
 
-    #: 소스 식별자 (예: 'kosaf', 'dreamspon')
+    #: 소스 식별자 (예: 'khu_janghak', 'onjungchoungnyeon')
     platform: str = "base"
+    #: True(API): fetch()가 모집중 전체를 돌려준다. 매 실행 동기화하고 빠진 공고는 삭제.
+    #: False(게시판): 새 글만 fetch_detail()로 상세를 받아 본문에서 구조화한다.
+    full_sync: bool = False
     #: 공공/민간
     source_type: SourceType = SourceType.PUBLIC
     #: 장학금/정부혜택
@@ -90,3 +93,6 @@ class BaseCrawler(abc.ABC):
     def fetch(self) -> list[RawPosting]:
         """공고 목록을 수집해 표준 DTO 리스트로 반환."""
         raise NotImplementedError
+
+    def fetch_detail(self, raw: RawPosting) -> None:
+        """게시판형 새 글의 상세 본문·첨부를 raw에 채운다. 기본은 할 일 없음."""

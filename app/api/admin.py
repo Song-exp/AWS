@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.core.security import require_admin
-from app.crawlers.registry import run_monthly_update
+from app.crawlers.registry import run_daily_update
 from app.models.crawl_run import CrawlRun, CrawlRunStatus
 
 router = APIRouter(
@@ -37,22 +37,10 @@ class CrawlRunOut(BaseModel):
         from_attributes = True
 
 
-class RunTriggerRequest(BaseModel):
-    # 선택: 특정 (연,월) 지정. 미지정 시 당월+익월 자동.
-    target_months: list[list[int]] | None = None
-
-
 @router.post("/run", response_model=CrawlRunOut)
-def trigger_run(
-    payload: RunTriggerRequest | None = None,
-    db: Session = Depends(get_db),
-) -> CrawlRunOut:
-    """월간 갱신을 수동 실행(동기). 대상 월 미지정 시 당월+익월."""
-    months = None
-    if payload and payload.target_months:
-        months = {(m[0], m[1]) for m in payload.target_months}
-    run = run_monthly_update(db, trigger="manual", target_months=months)
-    return CrawlRunOut.model_validate(run)
+def trigger_run(db: Session = Depends(get_db)) -> CrawlRunOut:
+    """일간 갱신(마감 삭제 + 신규 수집)을 수동 실행(동기)."""
+    return CrawlRunOut.model_validate(run_daily_update(db, trigger="manual"))
 
 
 @router.get("/runs", response_model=list[CrawlRunOut])
@@ -62,3 +50,64 @@ def list_runs(limit: int = 20, db: Session = Depends(get_db)) -> list[CrawlRunOu
         select(CrawlRun).order_by(CrawlRun.id.desc()).limit(limit)
     ).all()
     return [CrawlRunOut.model_validate(r) for r in rows]
+
+
+# --- 끝난 혜택 제보 확인 ---
+# 별도 라우터를 두는 이유는 prefix 가 /admin/crawl 이 아니기 때문이다.
+offer_report_router = APIRouter(
+    prefix="/admin/offer-reports",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
+
+
+class OfferReportRow(BaseModel):
+    offer_id: int
+    store_id: int
+    store_label: str
+    pay_method: str
+    discount_rate: int
+    report_count: int
+    is_active: bool
+    flagged: bool
+
+
+@offer_report_router.get("", response_model=list[OfferReportRow])
+def list_offer_reports(
+    min_count: int = 1,
+    db: Session = Depends(get_db),
+) -> list[OfferReportRow]:
+    """제보가 쌓인 혜택 목록. 많이 제보된 순.
+
+    자동 비활성을 하지 않기로 했으므로 이 목록이 사람의 판단 지점이다.
+    확인 후 store_offers.is_active 를 내린다.
+    """
+    from sqlalchemy import func
+
+    from app.core.config import settings
+    from app.models.community import Report
+    from app.models.store import Store, StoreOffer
+
+    rows = db.execute(
+        select(StoreOffer, Store, func.count(Report.id).label("cnt"))
+        .join(Report, Report.store_offer_id == StoreOffer.id)
+        .join(Store, Store.id == StoreOffer.store_id)
+        .group_by(StoreOffer.id, Store.id)
+        .having(func.count(Report.id) >= min_count)
+        .order_by(func.count(Report.id).desc())
+    ).all()
+
+    threshold = settings.store_offer_report_threshold
+    return [
+        OfferReportRow(
+            offer_id=offer.id,
+            store_id=store.id,
+            store_label=f"{store.brand} {store.branch}",
+            pay_method=offer.pay_method.value,
+            discount_rate=offer.discount_rate,
+            report_count=cnt,
+            is_active=offer.is_active,
+            flagged=threshold > 0 and cnt >= threshold,
+        )
+        for offer, store, cnt in rows
+    ]

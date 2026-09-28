@@ -12,9 +12,13 @@
 """
 from __future__ import annotations
 
+import os
+import re
+import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -33,7 +37,9 @@ from app.models.community import (
     Report,
     Scrap,
 )
+from app.models.store import SPEND_LABELS, SpendCategory
 from app.models.user import User
+from app.services.tier import compute_tier
 
 router = APIRouter(
     prefix="/community",
@@ -76,11 +82,17 @@ class PostSummaryOut(BaseModel):
     title: str
     preview: str                # 목록에서 2줄로 보여줄 본문 앞부분
     author_label: str           # '익명' 또는 닉네임
+    # 등급은 별명 글에만 싣는다. 익명 글에 붙이면 이용자가 적을 때
+    # '이 게시판의 고수는 한 명' → 익명N의 정체가 드러난다.
+    author_tier: str | None = None
+    category: SpendCategory | None = None
+    category_label: str | None = None
     is_question: bool
     like_count: int
     comment_count: int
     created_at: str | None = None
     is_mine: bool = False
+    thumbnail_url: str | None = None   # 첫 첨부 이미지(목록 썸네일)
 
 
 class CommentOut(BaseModel):
@@ -102,6 +114,9 @@ class PostDetailOut(BaseModel):
     title: str
     body: str
     author_label: str
+    author_tier: str | None = None
+    category: SpendCategory | None = None
+    category_label: str | None = None
     is_question: bool
     like_count: int
     comment_count: int
@@ -110,6 +125,7 @@ class PostDetailOut(BaseModel):
     scrapped_by_me: bool = False
     is_mine: bool = False
     created_at: str | None = None
+    image_urls: list[str] = Field(default_factory=list)
     comments: list[CommentOut] = Field(default_factory=list)
 
 
@@ -152,7 +168,20 @@ def _nickname_map(db: Session, posts: list[Post]) -> dict:
     return {uid: nick for uid, nick in rows}
 
 
-def _to_summary(db: Session, post: Post, user: User, nicknames: dict) -> PostSummaryOut:
+def _tier_map(db: Session, posts: list[Post]) -> dict:
+    """별명 글 작성자만 등급을 계산한다.
+
+    익명 글에는 등급을 싣지 않으므로 조회조차 하지 않는다 — 계산 비용이
+    아니라 노출 사고를 막기 위한 것이다.
+    """
+    ids = {p.author_id for p in posts if not p.is_anonymous and p.author_id}
+    return {uid: compute_tier(db, uid).label for uid in ids}
+
+
+def _to_summary(
+    db: Session, post: Post, user: User, nicknames: dict, tiers: dict | None = None
+) -> PostSummaryOut:
+    tiers = tiers or {}
     return PostSummaryOut(
         id=post.id,
         board_id=post.board_id,
@@ -160,11 +189,15 @@ def _to_summary(db: Session, post: Post, user: User, nicknames: dict) -> PostSum
         title=post.title,
         preview=_preview(post.body),
         author_label=_post_author_label(post, nicknames.get(post.author_id)),
+        author_tier=None if post.is_anonymous else tiers.get(post.author_id),
+        category=post.category,
+        category_label=SPEND_LABELS.get(post.category) if post.category else None,
         is_question=post.is_question,
         like_count=post.like_count,
         comment_count=post.comment_count,
         created_at=_iso(post.created_at),
         is_mine=post.author_id == user.id,
+        thumbnail_url=_image_url(post.image_names[0]) if post.image_names else None,
     )
 
 
@@ -172,8 +205,9 @@ def _page(db: Session, stmt, user: User, offset: int, limit: int) -> PostPage:
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     posts = db.scalars(stmt.offset(offset).limit(limit)).all()
     nicknames = _nickname_map(db, list(posts))
+    tiers = _tier_map(db, list(posts))
     return PostPage(
-        items=[_to_summary(db, p, user, nicknames) for p in posts],
+        items=[_to_summary(db, p, user, nicknames, tiers) for p in posts],
         total=total,
         offset=offset,
         limit=limit,
@@ -238,6 +272,9 @@ def list_boards(
 @router.get("/boards/{slug}/posts", response_model=PostPage)
 def list_board_posts(
     slug: str,
+    category: list[SpendCategory] | None = Query(
+        default=None, description="지출 분야 칩 필터(복수 가능)"
+    ),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=20, ge=1, le=50),
     user: User = Depends(current_user),
@@ -259,11 +296,10 @@ def list_board_posts(
         row.last_read_at = datetime.now(timezone.utc)
     db.commit()
 
-    stmt = (
-        _visible_posts()
-        .where(Post.board_id == board.id)
-        .order_by(Post.created_at.desc(), Post.id.desc())
-    )
+    stmt = _visible_posts().where(Post.board_id == board.id)
+    if category:
+        stmt = stmt.where(Post.category.in_(category))
+    stmt = stmt.order_by(Post.created_at.desc(), Post.id.desc())
     return _page(db, stmt, user, offset, limit)
 
 
@@ -286,7 +322,8 @@ def list_questions(
         .limit(limit)
     ).all()
     nicknames = _nickname_map(db, list(posts))
-    return [_to_summary(db, p, user, nicknames) for p in posts]
+    tiers = _tier_map(db, list(posts))
+    return [_to_summary(db, p, user, nicknames, tiers) for p in posts]
 
 
 # ---------------- HOT / BEST ----------------
@@ -383,6 +420,9 @@ class PostCreateIn(BaseModel):
     body: str = Field(min_length=1, max_length=10000)
     is_anonymous: bool = True
     is_question: bool = False
+    # 게시판이 '글의 목적'이라면 카테고리는 '글의 주제'다. 게시판 2개로
+    # 줄인 대신 이 축으로 탐색한다.
+    category: SpendCategory | None = None
 
 
 @router.post("/posts", response_model=PostDetailOut, status_code=201)
@@ -410,6 +450,7 @@ def create_post(
         body=payload.body.strip(),
         is_anonymous=anonymous,
         is_question=payload.is_question,
+        category=payload.category,
     )
     db.add(post)
     db.commit()
@@ -443,8 +484,88 @@ def delete_post(
     if post is None or post.deleted_at is not None or post.author_id != user.id:
         raise HTTPException(404, "글을 찾을 수 없습니다.")
     post.deleted_at = datetime.now(timezone.utc)
+    names, post.image_names = post.image_names or [], []
     db.commit()
+    for name in names:
+        _image_path(name).unlink(missing_ok=True)
     return Response(status_code=204)
+
+
+# ---------------- 첨부 이미지 ----------------
+MAX_IMAGES_PER_POST = 4
+# 확장자는 클라이언트가 준 이름이 아니라 파일 앞머리(매직 바이트)로 정한다.
+_IMAGE_SIGNATURES = (
+    (b"\xff\xd8\xff", "jpg"),
+    (b"\x89PNG\r\n\x1a\n", "png"),
+    (b"GIF87a", "gif"),
+    (b"GIF89a", "gif"),
+)
+_IMAGE_NAME = re.compile(r"^[0-9a-f]{32}\.(jpg|png|gif|webp)$")
+
+
+def _sniff_image(head: bytes) -> str | None:
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "webp"
+    return next((ext for sig, ext in _IMAGE_SIGNATURES if head.startswith(sig)), None)
+
+
+def _image_dir():
+    from pathlib import Path
+
+    return Path(settings.upload_dir) / "community"
+
+
+def _image_path(name: str):
+    return _image_dir() / name
+
+
+def _image_url(name: str) -> str:
+    # 프론트가 API_BASE를 앞에 붙인다(배포 경로가 바뀌어도 백엔드는 모른다).
+    return f"/community/images/{name}"
+
+
+@router.post("/posts/{post_id}/images", response_model=PostDetailOut)
+async def upload_post_images(
+    post_id: int,
+    files: list[UploadFile] = File(...),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> PostDetailOut:
+    """내 글에 이미지를 붙인다. 글을 먼저 만든 뒤 호출한다."""
+    post = db.get(Post, post_id)
+    if post is None or post.deleted_at is not None or post.author_id != user.id:
+        raise HTTPException(404, "글을 찾을 수 없습니다.")
+    existing = list(post.image_names or [])
+    if len(existing) + len(files) > MAX_IMAGES_PER_POST:
+        raise HTTPException(400, f"이미지는 글당 {MAX_IMAGES_PER_POST}장까지 올릴 수 있어요.")
+
+    # 전부 검사한 뒤에 저장한다. 중간에 실패하면 반쪽만 붙지 않게.
+    limit = settings.max_upload_mb * 1024 * 1024
+    staged: list[tuple[str, bytes]] = []
+    for f in files:
+        content = await f.read()
+        if len(content) > limit:
+            raise HTTPException(413, f"이미지가 너무 큽니다(최대 {settings.max_upload_mb}MB).")
+        ext = _sniff_image(content[:16])
+        if ext is None:
+            raise HTTPException(415, "JPG·PNG·GIF·WEBP 이미지만 올릴 수 있어요.")
+        staged.append((f"{uuid.uuid4().hex}.{ext}", content))
+
+    os.makedirs(_image_dir(), exist_ok=True)
+    for name, content in staged:
+        _image_path(name).write_bytes(content)
+    post.image_names = existing + [name for name, _ in staged]
+    db.commit()
+    db.refresh(post)
+    return _post_detail(db, post, user)
+
+
+@router.get("/images/{name}")
+def read_post_image(name: str) -> FileResponse:
+    # 이름 형식을 강제해 경로 조작(../)을 막는다.
+    if not _IMAGE_NAME.match(name) or not _image_path(name).is_file():
+        raise HTTPException(404, "이미지를 찾을 수 없습니다.")
+    return FileResponse(_image_path(name))
 
 
 def _post_detail(db: Session, post: Post, user: User) -> PostDetailOut:
@@ -517,6 +638,13 @@ def _post_detail(db: Session, post: Post, user: User) -> PostDetailOut:
         title=post.title,
         body=post.body,
         author_label=_post_author_label(post, nickname),
+        author_tier=(
+            None
+            if post.is_anonymous or not post.author_id
+            else compute_tier(db, post.author_id).label
+        ),
+        category=post.category,
+        category_label=SPEND_LABELS.get(post.category) if post.category else None,
         is_question=post.is_question,
         like_count=post.like_count,
         comment_count=post.comment_count,
@@ -525,6 +653,7 @@ def _post_detail(db: Session, post: Post, user: User) -> PostDetailOut:
         scrapped_by_me=scrapped is not None,
         is_mine=post.author_id == user.id,
         created_at=_iso(post.created_at),
+        image_urls=[_image_url(name) for name in post.image_names or []],
         comments=comment_out,
     )
 

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { fetchLocalBenefits, fetchNearbyStores, fetchOptions } from "../api";
+import {
+  fetchLocalBenefits,
+  fetchNearbyStores,
+  fetchOptions,
+  reportOffer,
+} from "../api";
 import { DEMO_PERSONAS, getPersonaForProfile } from "../personas";
 import type {
   BenefitProgram,
@@ -177,6 +182,8 @@ export default function MapPage({ profile }: Props) {
   const [selected, setSelected] = useState<Store | null>(null);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  // 내가 제보한 혜택. 서버는 총 건수만 주므로 '내가 눌렀는지'는 여기서 기억한다.
+  const [reportedOffers, setReportedOffers] = useState<Set<number>>(new Set());
   const [onlyMyCards, setOnlyMyCards] = useState(true);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [activeCat, setActiveCat] = useState<StoreCategory | null>(null);
@@ -515,6 +522,40 @@ export default function MapPage({ profile }: Props) {
     );
   }
 
+  async function toggleReport(offerId: number) {
+    try {
+      const result = await reportOffer(offerId);
+      setReportedOffers((current) => {
+        const next = new Set(current);
+        if (result.active) next.add(offerId);
+        else next.delete(offerId);
+        return next;
+      });
+      // 임계를 넘겼으면 추천이 바뀐다. 화면에 남은 BEST 배지가 거짓이 되므로
+      // 그 자리에서 반영한다.
+      if (result.flagged) {
+        setStores((current) =>
+          current.map((store) => ({
+            ...store,
+            offers: store.offers.map((offer) =>
+              offer.id === offerId
+                ? { ...offer, reported: true, report_count: result.count }
+                : offer
+            ),
+            best_deal:
+              store.offers.some((offer) => offer.id === offerId)
+                ? null
+                : store.best_deal,
+          }))
+        );
+      }
+    } catch (error) {
+      setApiError(
+        error instanceof Error ? error.message : "제보에 실패했습니다."
+      );
+    }
+  }
+
   function renderDeals(store: Store) {
     return (
       <div className="deal-details">
@@ -559,12 +600,31 @@ export default function MapPage({ profile }: Props) {
           <div className="deal-group">
             <p className="deal-title">간편결제</p>
             {store.offers.map((offer) => (
-              <div key={offer.pay_method} className="offer-row">
+              <div
+                key={offer.pay_method}
+                className={offer.reported ? "offer-row stale" : "offer-row"}
+              >
                 <span className={`pay-badge ${offer.pay_method}`}>
                   {PAY_LABELS[offer.pay_method]}
                 </span>
                 <strong>{offer.discount_rate}%</strong>
                 <small>{offer.condition_text}</small>
+                {offer.reported && (
+                  <span className="warn-badge">제보 {offer.report_count}건</span>
+                )}
+                {/* 확인창 없이 한 번에 보낸다. 물어보면 안 누르고, 안 누르면
+                    지도 데이터가 낡은 채로 남는다. 다시 누르면 취소. */}
+                <button
+                  type="button"
+                  className={
+                    reportedOffers.has(offer.id)
+                      ? "offer-report on"
+                      : "offer-report"
+                  }
+                  onClick={() => void toggleReport(offer.id)}
+                >
+                  {reportedOffers.has(offer.id) ? "제보함 ✓" : "끝난 혜택이에요"}
+                </button>
               </div>
             ))}
           </div>

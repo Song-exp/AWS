@@ -4,14 +4,21 @@ import type {
   LocalBenefitParams,
   LocalBenefitsPage,
   MetaOptions,
+  MyApplication,
   MyPageData,
   NearbyParams,
   AuthUser,
+  BenefitItemsPage,
   BoardCategory,
   CommunityBoard,
+  OfferReportResult,
+  Posting,
+  PostingDetail,
+  PostingPage,
   PostDetail,
   PostPage,
   PostSummary,
+  SpendCategory,
   SavingSummary,
   SpendPayload,
   Store,
@@ -99,6 +106,21 @@ export async function fetchMyPage(cardIds: number[]): Promise<MyPageData> {
     throw new Error(`마이페이지 조회 실패: ${res.status}`);
   }
   return (await res.json()) as MyPageData;
+}
+
+/** 자기소개서 한 편(문항 답변 전부)을 한 번에 저장한다. */
+export async function updateApplicationDocuments(
+  applicationId: string,
+  documents: { id: number; content_text: string }[]
+): Promise<MyApplication> {
+  const res = await fetch(`${API_BASE}/me/applications/${applicationId}/documents`, {
+    ...CREDS,
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ documents }),
+  });
+  if (!res.ok) throw new Error(await readError(res, "자기소개서를 저장하지 못했어요."));
+  return (await res.json()) as MyApplication;
 }
 
 
@@ -319,10 +341,16 @@ export async function fetchBoards(
 export async function fetchBoardPosts(
   slug: string,
   offset = 0,
-  limit = 20
+  limit = 20,
+  categories: SpendCategory[] = []
 ): Promise<PostPage> {
+  const params = new URLSearchParams({
+    offset: String(offset),
+    limit: String(limit),
+  });
+  categories.forEach((c) => params.append("category", c));
   return getJson<PostPage>(
-    `/community/boards/${slug}/posts?offset=${offset}&limit=${limit}`,
+    `/community/boards/${slug}/posts?${params}`,
     "글 목록 조회 실패"
   );
 }
@@ -356,10 +384,28 @@ export async function createPost(input: {
   body: string;
   is_anonymous: boolean;
   is_question: boolean;
+  category?: SpendCategory | null;
 }): Promise<PostDetail> {
   const res = await authRequest("/community/posts", input);
   if (!res.ok) throw new Error(await readError(res, "글 등록에 실패했습니다."));
   return (await res.json()) as PostDetail;
+}
+
+export async function uploadPostImages(postId: number, files: File[]): Promise<PostDetail> {
+  const form = new FormData();
+  files.forEach((file) => form.append("files", file));
+  const res = await fetch(`${API_BASE}/community/posts/${postId}/images`, {
+    ...CREDS,
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error(await readError(res, "이미지 업로드에 실패했습니다."));
+  return (await res.json()) as PostDetail;
+}
+
+/** 서버가 준 API 경로(/community/images/...)를 브라우저가 부를 수 있는 주소로. */
+export function apiUrl(path: string): string {
+  return `${API_BASE}${path}`;
 }
 
 export async function createComment(
@@ -410,3 +456,54 @@ export async function reportPost(postId: number, reason: string): Promise<void> 
   const res = await authRequest(`/community/posts/${postId}/report`, { reason });
   if (!res.ok) throw new Error(await readError(res, "신고에 실패했습니다."));
 }
+
+// ===== 혜택 탭 =====
+export async function fetchPostings(params: {
+  q?: string;
+  category?: "scholarship" | "gov_benefit" | null;
+  sort?: "deadline" | "recent";
+  offset?: number;
+  limit?: number;
+} = {}): Promise<PostingPage> {
+  const qs = new URLSearchParams();
+  if (params.q) qs.set("q", params.q);
+  if (params.category) qs.set("category", params.category);
+  qs.set("sort", params.sort ?? "deadline");
+  qs.set("offset", String(params.offset ?? 0));
+  qs.set("limit", String(params.limit ?? 20));
+  return getJson<PostingPage>(`/scholarships?${qs}`, "공고 목록 조회 실패");
+}
+
+export async function fetchPosting(id: number): Promise<PostingDetail> {
+  return getJson<PostingDetail>(`/scholarships/${id}`, "공고 조회 실패");
+}
+
+export async function fetchBenefitItems(
+  categories: SpendCategory[] = []
+): Promise<BenefitItemsPage> {
+  const qs = new URLSearchParams();
+  categories.forEach((c) => qs.append("category", c));
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return getJson<BenefitItemsPage>(`/benefits/items${suffix}`, "상시 혜택 조회 실패");
+}
+
+export async function toggleBenefitCheck(key: string): Promise<ToggleResult> {
+  const res = await fetch(`${API_BASE}/benefits/items/${key}/check`, {
+    ...CREDS,
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await readError(res, "체크에 실패했습니다."));
+  return (await res.json()) as ToggleResult;
+}
+
+/** '이미 끝난 혜택이에요' 제보 토글. 확인창 없이 한 번에 보낸다. */
+export async function reportOffer(offerId: number): Promise<OfferReportResult> {
+  const res = await fetch(`${API_BASE}/stores/offers/${offerId}/report`, {
+    ...CREDS,
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await readError(res, "제보에 실패했습니다."));
+  return (await res.json()) as OfferReportResult;
+}
+
+export type { Posting };

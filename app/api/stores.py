@@ -11,11 +11,15 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import settings
 from app.core.db import get_db
+from app.core.security import current_user
 from app.models.card import BenefitType, CardBenefit, Confidence
+from app.models.community import Report
+from app.models.user import User
 from app.models.store import PayMethod, Store, StoreCategory, StoreOffer
 from app.models.local_benefit import LocalBenefitMerchant
 from app.services.card_normalize import store_brand_key
@@ -35,9 +39,13 @@ def haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 
 class OfferOut(BaseModel):
+    id: int
     pay_method: PayMethod
     discount_rate: int
     condition_text: str | None = None
+    #: '이미 끝난 혜택이에요' 제보 수. 임계를 넘으면 프론트가 흐리게 표시한다.
+    report_count: int = 0
+    reported: bool = False
 
     class Config:
         from_attributes = True
@@ -194,15 +202,44 @@ def _to_benefit_out(b: CardBenefit) -> CardBenefitOut:
     )
 
 
-def _pick_best(offers: list[StoreOffer], benefits: list[CardBenefit]) -> BestDeal | None:
+def _to_offer_out(
+    o: StoreOffer, counts: dict[int, int], reported_ids: set[int]
+) -> OfferOut:
+    out = OfferOut.model_validate(o)
+    out.report_count = counts.get(o.id, 0)
+    out.reported = o.id in reported_ids
+    return out
+
+
+def _offer_report_counts(db: Session) -> dict[int, int]:
+    """offer_id -> 제보 수. 매장마다 쿼리하면 N+1이 되므로 한 번에 읽는다."""
+    rows = db.execute(
+        select(Report.store_offer_id, func.count(Report.id))
+        .where(Report.store_offer_id.is_not(None))
+        .group_by(Report.store_offer_id)
+    ).all()
+    return {offer_id: cnt for offer_id, cnt in rows}
+
+
+def _pick_best(
+    offers: list[StoreOffer],
+    benefits: list[CardBenefit],
+    reported_offer_ids: set[int] = frozenset(),
+) -> BestDeal | None:
     """간편결제 vs 카드 중 더 유리한 쪽 선택.
 
     카드 혜택 범위값('10~30%')은 과대표시를 피하려 **최소값**으로 비교한다.
     정액/이벤트 혜택은 정률 비교가 불가하므로 후보에서 제외한다.
+
+    끝난 혜택으로 제보된 간편결제 할인은 추천에서 뺀다. 목록에는 남겨
+    사용자가 판단하게 하되, **1순위로 밀어주는 것만은 막는다** — 여기가
+    실제로 헛걸음이 발생하는 지점이다.
     """
     best: BestDeal | None = None
 
     for o in offers:
+        if o.id in reported_offer_ids:
+            continue
         if best is None or o.discount_rate > best.discount_rate:
             best = BestDeal(
                 kind="simple_pay",
@@ -248,6 +285,11 @@ def nearby_stores(
         stmt = stmt.where(Store.category.in_(category))
     stores = db.scalars(stmt).all()
     benefits_by_brand = _load_card_benefits(db, include_unverified, card_ids)
+    report_counts = _offer_report_counts(db)
+    threshold = settings.store_offer_report_threshold
+    reported_ids = {
+        oid for oid, cnt in report_counts.items() if threshold > 0 and cnt >= threshold
+    }
 
     items: list[StoreOut] = []
     for s in stores:
@@ -278,12 +320,12 @@ def nearby_stores(
                 lng=s.lng,
                 mark=s.mark,
                 color=s.color,
-                offers=[OfferOut.model_validate(o) for o in offers],
+                offers=[_to_offer_out(o, report_counts, reported_ids) for o in offers],
                 card_benefits=[_to_benefit_out(b) for b in cbs],
                 distance_m=round(distance, 1) if distance is not None else None,
                 max_discount_rate=max((o.discount_rate for o in offers), default=0),
                 max_card_discount_rate=max(pct_values, default=0),
-                best_deal=_pick_best(offers, cbs),
+                best_deal=_pick_best(offers, cbs, reported_ids),
             )
         )
 
@@ -357,6 +399,11 @@ def get_store(
     offers = _active_offers(s, None)
     bkey = store_brand_key(s.brand)
     cbs = _load_card_benefits(db, include_unverified, card_ids).get(bkey, [])
+    report_counts = _offer_report_counts(db)
+    threshold = settings.store_offer_report_threshold
+    reported_ids = {
+        oid for oid, cnt in report_counts.items() if threshold > 0 and cnt >= threshold
+    }
     pct_values = [b.value_min for b in cbs if b.benefit_type == BenefitType.PERCENT and b.value_min]
 
     return StoreOut(
@@ -369,9 +416,62 @@ def get_store(
         lng=s.lng,
         mark=s.mark,
         color=s.color,
-        offers=[OfferOut.model_validate(o) for o in offers],
+        offers=[_to_offer_out(o, report_counts, reported_ids) for o in offers],
         card_benefits=[_to_benefit_out(b) for b in cbs],
         max_discount_rate=max((o.discount_rate for o in offers), default=0),
         max_card_discount_rate=max(pct_values, default=0),
-        best_deal=_pick_best(offers, cbs),
+        best_deal=_pick_best(offers, cbs, reported_ids),
+    )
+
+
+class OfferReportOut(BaseModel):
+    active: bool          # 내가 제보한 상태인가
+    count: int            # 이 혜택의 총 제보 수
+    flagged: bool         # 임계를 넘겨 추천에서 빠졌는가
+
+
+@router.post("/offers/{offer_id}/report", response_model=OfferReportOut)
+def report_offer(
+    offer_id: int,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> OfferReportOut:
+    """'이미 끝난 혜택이에요' 제보 토글.
+
+    확인창도 사유 입력도 없다. 물어보면 안 누르고, 안 누르면 지도 데이터가
+    영원히 낡은 채로 남는다. 오탭은 다시 눌러 취소한다.
+
+    같은 사람의 중복 제보는 1건으로 본다(커뮤니티 신고와 같은 규칙).
+    """
+    offer = db.get(StoreOffer, offer_id)
+    if offer is None:
+        raise HTTPException(status_code=404, detail="혜택을 찾을 수 없습니다.")
+
+    row = db.scalar(
+        select(Report).where(
+            Report.store_offer_id == offer_id, Report.reporter_id == user.id
+        )
+    )
+    if row is None:
+        db.add(
+            Report(
+                store_offer_id=offer_id,
+                reporter_id=user.id,
+                reason="offer_expired",
+            )
+        )
+        active = True
+    else:
+        db.delete(row)
+        active = False
+    db.commit()
+
+    count = db.scalar(
+        select(func.count(Report.id)).where(Report.store_offer_id == offer_id)
+    ) or 0
+    threshold = settings.store_offer_report_threshold
+    return OfferReportOut(
+        active=active,
+        count=count,
+        flagged=threshold > 0 and count >= threshold,
     )
