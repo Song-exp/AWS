@@ -77,6 +77,8 @@ export interface Offer {
   pay_method: PayMethod;
   discount_rate: number;
   condition_text: string | null;
+  /** 실제 프로모션을 확인하지 않은 예시 값 */
+  is_sample: boolean;
 }
 
 export type BenefitType =
@@ -340,6 +342,10 @@ export interface SpendPayload {
 export interface AuthUser {
   id: string;
   email: string | null;
+  /** 인증 메일의 링크를 눌러 주소가 확인됐는가 */
+  email_verified: boolean;
+  /** 마감 알림 메일 수신 동의 */
+  reminder_enabled: boolean;
   nickname: string | null;
   income_bracket: number | null;
   gpa: number | null;

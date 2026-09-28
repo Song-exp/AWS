@@ -96,6 +96,7 @@ def test_production_boot_fails_without_required_settings():
         app_env="production",
         deepseek_api_key="",
         admin_token="",
+        secret_key="dev-insecure-secret",
         database_url="sqlite:///./data/app.db",
         cors_origins="http://localhost:5173",
         smtp_host="",
@@ -105,7 +106,7 @@ def test_production_boot_fails_without_required_settings():
         _require_production_settings(s)
 
     msg = str(e.value)
-    for expected in ["DEEPSEEK_API_KEY", "ADMIN_TOKEN", "DATABASE_URL",
+    for expected in ["DEEPSEEK_API_KEY", "ADMIN_TOKEN", "SECRET_KEY", "DATABASE_URL",
                      "CORS_ORIGINS", "SESSION_COOKIE_SECURE",
                      "SMTP_HOST", "APP_BASE_URL"]:
         assert expected in msg, f"{expected} 누락을 잡지 못했다: {msg}"
@@ -118,6 +119,7 @@ def test_production_boot_passes_when_configured():
         app_env="production",
         deepseek_api_key="sk-real",
         admin_token="strong-token",
+        secret_key="k" * 32,
         database_url="postgresql+psycopg://u:p@db:5432/app",
         cors_origins="https://benefit.example.com",
         session_cookie_secure=True,

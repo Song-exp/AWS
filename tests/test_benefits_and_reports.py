@@ -17,7 +17,7 @@ from tests.conftest import ADMIN_TOKEN, make_scholarship
 
 def _login(client, email="user@khu.ac.kr", password="user-password-1"):
     client.cookies.clear()
-    r = client.post("/auth/signup", json={"email": email, "password": password})
+    r = client.post("/auth/signup", json={"privacy_consent": True, "email": email, "password": password})
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -242,7 +242,8 @@ def test_reminder_mail_is_one_message_per_user(client, db, monkeypatch):
 
     sent: list[tuple] = []
     monkeypatch.setattr(
-        reminders, "send_deadline_reminder", lambda to, items: sent.append((to, items))
+        reminders, "send_deadline_reminder",
+        lambda to, items, unsubscribe_url: sent.append((to, items)),
     )
 
     now = datetime.now(timezone.utc)
@@ -254,6 +255,12 @@ def test_reminder_mail_is_one_message_per_user(client, db, monkeypatch):
     ])
     db.commit()
     _login(client, "i@khu.ac.kr", "i-password-1")
+    # 알림은 수신에 동의하고 주소가 확인된 사용자에게만 간다
+    from app.models.user import User
+
+    me = db.query(User).one()
+    me.reminder_enabled, me.email_verified_at = True, now
+    db.commit()
 
     assert reminders.send_deadline_reminders(db, now) == 1
     to, items = sent[0]

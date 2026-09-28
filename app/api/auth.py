@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -21,6 +22,10 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.security import (
     MAX_PASSWORD_LENGTH,
+    UNSUBSCRIBE_PURPOSE,
+    VERIFY_PURPOSE,
+    read_link_token,
+    sign_link_token,
     consume_reset_token,
     invalidate_reset_tokens,
     issue_reset_token,
@@ -59,6 +64,10 @@ class SignupIn(BaseModel):
     nickname: str | None = None
     # 로그인 전에 이 브라우저가 쓰던 익명 UUID. 있으면 데이터를 승계한다.
     claim_user_id: uuid.UUID | None = None
+    # 개인정보 수집·이용 동의(필수). 기본값이 False라 빠뜨리면 가입이 거절된다.
+    privacy_consent: bool = False
+    # 마감 알림 메일 수신 동의(선택).
+    reminder_opt_in: bool = False
 
 
 class LoginIn(BaseModel):
@@ -69,6 +78,8 @@ class LoginIn(BaseModel):
 class UserOut(BaseModel):
     id: str
     email: str | None = None
+    email_verified: bool = False
+    reminder_enabled: bool = False
     nickname: str | None = None
     income_bracket: int | None = None
     gpa: float | None = None
@@ -88,6 +99,8 @@ def _to_out(u: User) -> UserOut:
     return UserOut(
         id=str(u.id),
         email=u.email,
+        email_verified=u.email_verified_at is not None,
+        reminder_enabled=bool(u.reminder_enabled),
         nickname=u.nickname,
         income_bracket=u.income_bracket,
         gpa=u.gpa,
@@ -146,9 +159,29 @@ def _claim_anonymous_data(db: Session, claim_id: uuid.UUID, new_id: uuid.UUID) -
     return moved
 
 
+def _send_verification(user: User) -> None:
+    """인증 메일 발송. 실패해도 가입은 막지 않는다(마이페이지에서 다시 보낼 수 있다)."""
+    token = sign_link_token(
+        VERIFY_PURPOSE,
+        user.id,
+        user.email,
+        ttl=timedelta(hours=settings.email_verify_ttl_hours),
+    )
+    try:
+        mailer.send_email_verification(
+            to=user.email,
+            verify_url=f"{settings.app_base_url.rstrip('/')}/?verify_token={token}",
+            ttl_hours=settings.email_verify_ttl_hours,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("이메일 인증 메일 발송 실패: %s", user.email)
+
+
 @router.post("/signup", response_model=UserOut, status_code=201, dependencies=_BRUTE_FORCE_GUARD)
 def signup(payload: SignupIn, response: Response, db: Session = Depends(get_db)) -> UserOut:
     email = _validate_credentials(payload.email, payload.password)
+    if not payload.privacy_consent:
+        raise HTTPException(422, "개인정보 수집·이용에 동의해야 가입할 수 있습니다.")
 
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(409, "이미 가입된 이메일입니다.")
@@ -157,10 +190,13 @@ def signup(payload: SignupIn, response: Response, db: Session = Depends(get_db))
         email=email,
         nickname=payload.nickname,
         password_hash=hash_password(payload.password),
+        privacy_consent_at=datetime.now(timezone.utc),
+        reminder_enabled=payload.reminder_opt_in,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
+    _send_verification(user)
 
     if payload.claim_user_id:
         _claim_anonymous_data(db, payload.claim_user_id, user.id)
@@ -225,6 +261,8 @@ class ProfileIn(BaseModel):
     card_ids: list[int] | None = None
     student_credentials: list[str] | None = None
     benefit_programs: list[str] | None = None
+    # 마감 알림 메일 수신 여부. 마이페이지에서 켜고 끈다.
+    reminder_enabled: bool | None = None
 
 
 @router.put("/profile", response_model=UserOut)
@@ -410,9 +448,71 @@ def reset_password(payload: ResetPasswordIn, db: Session = Depends(get_db)) -> R
         raise HTTPException(400, "만료되었거나 이미 사용된 링크입니다.")
 
     user.password_hash = hash_password(payload.new_password)
+    # 재설정 링크는 그 주소의 메일함에서만 열 수 있다. 소유 확인으로 친다.
+    if user.email_verified_at is None:
+        user.email_verified_at = datetime.now(timezone.utc)
     db.commit()
 
     # 비밀번호를 잃어버렸다는 것은 계정이 남의 손에 있었을 수 있다는 뜻이다.
     # 기존 세션을 전부 끊는다. 재설정 후에는 새로 로그인하게 한다.
     revoke_all_sessions(db, user.id)
+    return Response(status_code=204)
+
+
+# ---------------- 이메일 인증 · 알림 수신 거부 ----------------
+class LinkTokenIn(BaseModel):
+    token: str
+
+
+def _user_for_link(db: Session, purpose: str, token: str) -> User:
+    """메일 링크의 토큰으로 사용자를 찾는다. 주소가 바뀌었으면 옛 링크는 무효다."""
+    parsed = read_link_token(purpose, token)
+    user = db.get(User, parsed[0]) if parsed else None
+    if user is None or user.email != parsed[1]:
+        raise HTTPException(400, "만료되었거나 올바르지 않은 링크입니다.")
+    return user
+
+
+@router.post(
+    "/email/verify",
+    status_code=204,
+    response_class=Response,
+    dependencies=_BRUTE_FORCE_GUARD,
+)
+def verify_email(payload: LinkTokenIn, db: Session = Depends(get_db)) -> Response:
+    """인증 메일의 링크 처리. 여러 번 눌러도 결과가 같다."""
+    user = _user_for_link(db, VERIFY_PURPOSE, payload.token)
+    if user.email_verified_at is None:
+        user.email_verified_at = datetime.now(timezone.utc)
+        db.commit()
+    return Response(status_code=204)
+
+
+@router.post(
+    "/email/resend",
+    status_code=204,
+    response_class=Response,
+    dependencies=_BRUTE_FORCE_GUARD,
+)
+def resend_verification(user: User = Depends(current_user)) -> Response:
+    """인증 메일 다시 보내기. 분당 상한이 걸려 있어 메일 폭탄으로 쓸 수 없다."""
+    if user.email_verified_at is None and user.email:
+        _send_verification(user)
+    return Response(status_code=204)
+
+
+@router.post(
+    "/reminders/unsubscribe",
+    status_code=204,
+    response_class=Response,
+    dependencies=_BRUTE_FORCE_GUARD,
+)
+def unsubscribe_reminders(
+    payload: LinkTokenIn, db: Session = Depends(get_db)
+) -> Response:
+    """알림 메일의 수신 거부 링크 처리. 로그인 없이 동작해야 한다."""
+    user = _user_for_link(db, UNSUBSCRIBE_PURPOSE, payload.token)
+    if user.reminder_enabled:
+        user.reminder_enabled = False
+        db.commit()
     return Response(status_code=204)

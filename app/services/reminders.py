@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.security import UNSUBSCRIBE_PURPOSE, sign_link_token
 from app.models.scholarship import Category, PostingStatus, Scholarship
 from app.models.user import User
 from app.schemas.schemas import UserProfile
@@ -78,7 +79,14 @@ def send_deadline_reminders(db: Session, now: datetime | None = None) -> int:
     if not due:
         return 0
 
-    users = db.scalars(select(User).where(User.email.is_not(None))).all()
+    # 수신에 동의했고 주소가 본인 것으로 확인된 사용자에게만 보낸다.
+    users = db.scalars(
+        select(User).where(
+            User.email.is_not(None),
+            User.reminder_enabled.is_(True),
+            User.email_verified_at.is_not(None),
+        )
+    ).all()
     sent = 0
     for user in users:
         if not user.email:
@@ -99,7 +107,12 @@ def send_deadline_reminders(db: Session, now: datetime | None = None) -> int:
             continue
         items.sort(key=lambda i: i["days_left"])
         try:
-            send_deadline_reminder(user.email, items)
+            token = sign_link_token(UNSUBSCRIBE_PURPOSE, user.id, user.email)
+            send_deadline_reminder(
+                user.email,
+                items,
+                f"{settings.app_base_url.rstrip('/')}/?unsubscribe_token={token}",
+            )
             sent += 1
         except Exception:  # noqa: BLE001 - 한 명의 발송 실패가 전체를 멈추면 안 된다
             logger.exception("deadline reminder failed for one user")

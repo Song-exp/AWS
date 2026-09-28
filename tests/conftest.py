@@ -93,7 +93,7 @@ def auth_client(client: TestClient) -> TestClient:
     """
     r = client.post(
         "/auth/signup",
-        json={"email": "tester@khu.ac.kr", "password": "test-password-1"},
+        json={"privacy_consent": True, "email": "tester@khu.ac.kr", "password": "test-password-1"},
     )
     assert r.status_code == 201, r.text
     return client

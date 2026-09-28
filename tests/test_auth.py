@@ -14,7 +14,7 @@ PASSWORD = "correct-horse-8"
 
 
 def signup(client, email=EMAIL, password=PASSWORD, **kw):
-    return client.post("/auth/signup", json={"email": email, "password": password, **kw})
+    return client.post("/auth/signup", json={"privacy_consent": True, "email": email, "password": password, **kw})
 
 
 def login(client, email=EMAIL, password=PASSWORD):

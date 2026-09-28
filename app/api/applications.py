@@ -51,6 +51,7 @@ async def upload_application(
     try:
         text = extract_text(dest)
     except UnsupportedFileType as e:
+        os.remove(dest)  # 거절한 파일을 디스크에 남기지 않는다
         raise HTTPException(status_code=415, detail=str(e))
 
     app_row = UserApplication(

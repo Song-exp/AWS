@@ -71,7 +71,22 @@ def send_password_reset(to: str, reset_url: str, ttl_minutes: int) -> None:
     )
 
 
-def send_deadline_reminder(to: str, items: list[dict]) -> None:
+def send_email_verification(to: str, verify_url: str, ttl_hours: int) -> None:
+    """가입한 주소가 본인 것인지 확인하는 링크."""
+    send_email(
+        to=to,
+        subject="[대학생 혜택 통합 서비스] 이메일 인증",
+        body=(
+            "가입해 주셔서 감사합니다.\n\n"
+            f"아래 링크를 눌러 이메일 주소를 인증해 주세요. {ttl_hours}시간 뒤 만료됩니다.\n\n"
+            f"{verify_url}\n\n"
+            "본인이 가입하지 않았다면 이 메일을 무시하셔도 됩니다.\n"
+            "인증하지 않은 주소로는 알림 메일을 보내지 않습니다.\n"
+        ),
+    )
+
+
+def send_deadline_reminder(to: str, items: list[dict], unsubscribe_url: str) -> None:
     """마감 임박 공고 알림.
 
     돈을 못 아끼는 1위 원인은 '비싸게 샀다'가 아니라 '기간이 지나서 못
@@ -92,6 +107,8 @@ def send_deadline_reminder(to: str, items: list[dict]) -> None:
         body=(
             "신청 기간이 얼마 남지 않은 공고가 있습니다.\n\n"
             + "\n".join(lines)
-            + "\n\n알림이 필요 없으면 마이페이지에서 끌 수 있습니다.\n"
+            + "\n\n이 메일은 마감 알림 수신에 동의하신 분께 보냅니다.\n"
+            "더 받지 않으려면 아래 링크를 누르거나 마이페이지에서 끌 수 있습니다.\n"
+            f"{unsubscribe_url}\n"
         ),
     )

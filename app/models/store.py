@@ -10,6 +10,7 @@ import enum
 from datetime import date, datetime
 
 from sqlalchemy import (
+    false,
     BigInteger,
     Boolean,
     Date,
@@ -145,6 +146,12 @@ class StoreOffer(Base):
     valid_from: Mapped[date | None] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # 실제 프로모션을 확인하지 않은 예시 값. 시드(legacy standardOffers)가 넣는 혜택은
+    # 전 매장 동일 할인율이라 사실이 아니다. 화면에 '예시'로 표시하고, 실제 값을
+    # 확인해 넣을 때 False 로 내린다.
+    is_sample: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
 
     store: Mapped["Store"] = relationship(back_populates="offers")
 

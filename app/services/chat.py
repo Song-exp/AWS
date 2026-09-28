@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
+import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
@@ -79,18 +81,42 @@ class ChatSession:
     draft: dict | None = None
     history: list[tuple[str, str]] = field(default_factory=list)  # (role, text)
     uploaded_docs: int = 0
+    last_seen: float = field(default_factory=time.monotonic)
 
 
 _SESSIONS: dict[str, ChatSession] = {}
+_SESSIONS_LOCK = threading.Lock()
+# ponytail: 프로세스 메모리 세션이라 만료와 상한을 직접 둔다. 없으면 방문자 수만큼
+# 끝없이 쌓여 메모리가 작은 서버에서 프로세스가 죽는다. 인스턴스를 늘리게 되면
+# Redis(TTL 내장)로 옮기고 이 코드는 지운다.
+SESSION_IDLE_SEC = 6 * 3600
+MAX_SESSIONS = 2000
+
+
+def _evict_sessions(now: float) -> None:
+    """오래 안 쓴 세션을 버린다. 상한을 넘으면 가장 오래된 것부터 버린다."""
+    for sid, sess in list(_SESSIONS.items()):
+        if now - sess.last_seen > SESSION_IDLE_SEC:
+            del _SESSIONS[sid]
+    overflow = len(_SESSIONS) - MAX_SESSIONS + 1
+    if overflow > 0:
+        oldest = sorted(_SESSIONS.items(), key=lambda kv: kv[1].last_seen)[:overflow]
+        for sid, _ in oldest:
+            del _SESSIONS[sid]
 
 
 def get_or_create_session(session_id: str | None, user_id: uuid.UUID | None) -> ChatSession:
-    if session_id and session_id in _SESSIONS:
-        return _SESSIONS[session_id]
-    sid = session_id or uuid.uuid4().hex
-    sess = ChatSession(session_id=sid, user_id=user_id)
-    _SESSIONS[sid] = sess
-    return sess
+    now = time.monotonic()
+    with _SESSIONS_LOCK:
+        sess = _SESSIONS.get(session_id) if session_id else None
+        if sess is not None and now - sess.last_seen <= SESSION_IDLE_SEC:
+            sess.last_seen = now
+            return sess
+        _evict_sessions(now)
+        sid = session_id or uuid.uuid4().hex
+        sess = ChatSession(session_id=sid, user_id=user_id, last_seen=now)
+        _SESSIONS[sid] = sess
+        return sess
 
 
 # ---------------- 조건 파싱 ----------------

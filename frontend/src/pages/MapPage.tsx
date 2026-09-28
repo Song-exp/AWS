@@ -599,6 +599,12 @@ export default function MapPage({ profile }: Props) {
         {store.offers.length > 0 && (
           <div className="deal-group">
             <p className="deal-title">간편결제</p>
+            {store.offers.some((offer) => offer.is_sample) && (
+              <p className="deal-note">
+                예시 표시는 아직 확인하지 못한 값이에요. 실제 할인은 결제 앱에서
+                확인해주세요.
+              </p>
+            )}
             {store.offers.map((offer) => (
               <div
                 key={offer.pay_method}
@@ -607,6 +613,7 @@ export default function MapPage({ profile }: Props) {
                 <span className={`pay-badge ${offer.pay_method}`}>
                   {PAY_LABELS[offer.pay_method]}
                 </span>
+                {offer.is_sample && <span className="warn-badge">예시</span>}
                 <strong>{offer.discount_rate}%</strong>
                 <small>{offer.condition_text}</small>
                 {offer.reported && (

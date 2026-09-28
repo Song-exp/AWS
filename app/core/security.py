@@ -406,3 +406,46 @@ def rate_limit_auth(request: Request) -> None:
             headers={"Retry-After": str(retry_after)},
         )
     hits.append(now)
+
+
+# ---------------- 메일 링크 서명 토큰 ----------------
+# 이메일 인증과 수신 거부 링크에 쓴다. DB에 저장하지 않고 HMAC 서명으로 검증한다.
+# 수신 거부 링크는 몇 달 뒤에 눌러도 동작해야 하므로 만료가 없고, 여러 번
+# 눌러도 결과가 같아 1회용일 필요도 없다. 비밀번호 재설정처럼 한 번 쓰면
+# 죽어야 하는 토큰은 여기 말고 password_reset_tokens 를 쓴다.
+VERIFY_PURPOSE = "verify-email"
+UNSUBSCRIBE_PURPOSE = "unsubscribe"
+
+
+def _sign(payload: str) -> str:
+    mac = hmac.new(
+        settings.secret_key.encode("utf-8"), payload.encode("ascii"), hashlib.sha256
+    ).digest()
+    return base64.urlsafe_b64encode(mac).decode("ascii").rstrip("=")
+
+
+def sign_link_token(
+    purpose: str, user_id: uuid.UUID, email: str, ttl: timedelta | None = None
+) -> str:
+    """purpose 는 서명에 포함된다. 수신 거부 링크로 이메일 인증을 할 수 없다."""
+    exp = int((datetime.now(timezone.utc) + ttl).timestamp()) if ttl else 0
+    raw = f"{purpose}|{user_id}|{exp}|{email}"
+    payload = base64.urlsafe_b64encode(raw.encode("utf-8")).decode("ascii").rstrip("=")
+    return f"{payload}.{_sign(payload)}"
+
+
+def read_link_token(purpose: str, token: str) -> tuple[uuid.UUID, str] | None:
+    """서명·용도·만료를 확인하고 (user_id, email)을 돌려준다. 아니면 None."""
+    payload, _, sig = token.partition(".")
+    try:
+        if not sig or not hmac.compare_digest(sig, _sign(payload)):
+            return None
+        raw = base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)).decode("utf-8")
+        got_purpose, uid, exp, email = raw.split("|", 3)
+        if got_purpose != purpose:
+            return None
+        if int(exp) and int(exp) <= int(datetime.now(timezone.utc).timestamp()):
+            return None
+        return uuid.UUID(uid), email
+    except (ValueError, UnicodeError):
+        return None

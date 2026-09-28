@@ -102,9 +102,11 @@ async def upload_in_chat(
     try:
         text = extract_text(dest)
     except UnsupportedFileType as e:
+        os.remove(dest)  # 거절한 파일을 디스크에 남기지 않는다
         raise HTTPException(status_code=415, detail=str(e))
 
     if not text.strip():
+        os.remove(dest)
         raise HTTPException(
             status_code=422,
             detail="파일에서 텍스트를 추출하지 못했습니다. 이미지로만 된 PDF일 수 있어요.",

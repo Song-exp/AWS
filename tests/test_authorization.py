@@ -13,7 +13,7 @@ B = ("bob@khu.ac.kr", "bob-password-1")
 
 def _signup(client, creds):
     client.cookies.clear()
-    r = client.post("/auth/signup", json={"email": creds[0], "password": creds[1]})
+    r = client.post("/auth/signup", json={"privacy_consent": True, "email": creds[0], "password": creds[1]})
     assert r.status_code == 201
     return r.json()["id"]
 
@@ -123,7 +123,7 @@ def test_signup_claims_anonymous_data(client, db):
     db.commit()
 
     client.cookies.clear()
-    r = client.post("/auth/signup", json={
+    r = client.post("/auth/signup", json={"privacy_consent": True, 
         "email": A[0], "password": A[1], "claim_user_id": str(anon),
     })
     assert r.status_code == 201
@@ -137,7 +137,7 @@ def test_cannot_claim_data_already_owned_by_an_account(client, db):
     alice_id = _signup(client, A)
 
     client.cookies.clear()
-    r = client.post("/auth/signup", json={
+    r = client.post("/auth/signup", json={"privacy_consent": True, 
         "email": B[0], "password": B[1], "claim_user_id": alice_id,
     })
     assert r.status_code == 409

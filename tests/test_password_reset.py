@@ -16,7 +16,7 @@ NEW_PASSWORD = "brand-new-pass-9"
 
 def _signup(client, email=EMAIL, password=PASSWORD):
     client.cookies.clear()
-    r = client.post("/auth/signup", json={"email": email, "password": password})
+    r = client.post("/auth/signup", json={"privacy_consent": True, "email": email, "password": password})
     assert r.status_code == 201
     client.cookies.clear()
 
@@ -147,7 +147,7 @@ def test_reset_rejects_weak_password(client, sent_links, password):
 def test_reset_revokes_existing_sessions(client, sent_links):
     """비밀번호를 잃어버렸다면 계정이 남의 손에 있었을 수 있다."""
     client.cookies.clear()
-    client.post("/auth/signup", json={"email": EMAIL, "password": PASSWORD})
+    client.post("/auth/signup", json={"privacy_consent": True, "email": EMAIL, "password": PASSWORD})
     stolen = client.cookies.get("benefit_session")
 
     client.post("/auth/password/forgot", json={"email": EMAIL})
@@ -162,7 +162,7 @@ def test_reset_revokes_existing_sessions(client, sent_links):
 def test_normal_password_change_invalidates_reset_links(client, sent_links):
     """재설정 링크를 요청해 둔 채 정상 변경했다면, 그 링크는 죽어야 한다."""
     client.cookies.clear()
-    client.post("/auth/signup", json={"email": EMAIL, "password": PASSWORD})
+    client.post("/auth/signup", json={"privacy_consent": True, "email": EMAIL, "password": PASSWORD})
     client.post("/auth/password/forgot", json={"email": EMAIL})
     token = _token_from(sent_links[0])
 

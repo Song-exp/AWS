@@ -137,12 +137,16 @@ def seed(js_path: str | None = None) -> dict:
                             condition_text=condition,
                             valid_from=date.today().replace(day=1),
                             is_active=True,
+                            is_sample=True,
                         )
                     )
                     created_offers += 1
                 else:
-                    dup.discount_rate = rate
-                    dup.condition_text = condition
+                    # 사람이 실제 값으로 고친 혜택은 시드가 덮어쓰지 않는다.
+                    if dup.is_sample or dup.discount_rate == rate:
+                        dup.discount_rate = rate
+                        dup.condition_text = condition
+                        dup.is_sample = True
         db.commit()
     finally:
         db.close()

@@ -33,6 +33,12 @@ from app.core.config import settings
 from app.core.db import init_db
 from app.services.scheduler import shutdown_scheduler, start_scheduler
 
+# 설정이 없으면 INFO 로그(크롤 결과, 알림 발송 수)가 어디에도 남지 않는다.
+# uvicorn 자체 로거는 전파를 끄고 있어 중복 출력되지 않는다.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -80,6 +86,7 @@ app.include_router(benefits.router)
 app.include_router(community.router)
 app.include_router(admin.router)
 app.include_router(admin.offer_report_router)
+app.include_router(admin.moderation_router)
 app.include_router(chat_api.router)
 app.include_router(chat_api.index_router)
 

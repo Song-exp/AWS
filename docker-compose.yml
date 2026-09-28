@@ -1,0 +1,29 @@
+# 서버 1대 배포: 백엔드 + Caddy(HTTPS). DB는 외부(Supabase), 프론트는 Vercel.
+# 같은 디렉터리의 .env 에 앱 환경변수와 DOMAIN 을 함께 둔다.
+services:
+  backend:
+    build: .
+    env_file: .env
+    environment:
+      UPLOAD_DIR: /srv/uploads
+    volumes:
+      - uploads:/srv/uploads
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  caddy_data:

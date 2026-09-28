@@ -1,5 +1,5 @@
 # 이 프로젝트는 Python 3.14 venv에서 검증되었습니다.
-# scrapy/playwright 등 일부 패키지는 소스 빌드가 필요할 수 있으므로,
+# 일부 패키지는 소스 빌드가 필요할 수 있으므로,
 # 프리빌트 휠만 사용하려면 다음처럼 설치하세요:
 #   pip install --only-binary=:all: -r requirements.txt
 
@@ -17,9 +17,7 @@ alembic==1.19.1
 pydantic==2.13.4
 pydantic-settings==2.15.0
 
-# --- Crawling (실제 셀렉터 구현 단계에서 사용; 현재는 스텁) ---
-scrapy==2.18.0
-playwright==1.62.0
+# --- Crawling ---
 httpx==0.28.1
 beautifulsoup4==4.12.3
 lxml==6.1.2

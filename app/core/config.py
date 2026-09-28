@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     # 비어 있으면 운영 모드 부팅이 실패한다(아래 _require_production_settings).
     admin_token: str = ""
 
+    # 메일 링크(이메일 인증·수신 거부) 서명 키. 새면 남의 계정을 인증 처리하거나
+    # 알림을 끌 수 있다. 바꾸면 이미 나간 링크는 전부 무효가 된다.
+    secret_key: str = "dev-insecure-secret"
+    # 이메일 인증 링크 수명.
+    email_verify_ttl_hours: int = 48
+
     # --- 로그인 세션 ---
     session_cookie_name: str = "benefit_session"
     session_ttl_days: int = 30
@@ -148,6 +154,8 @@ def _require_production_settings(s: "Settings") -> None:
         missing.append("DEEPSEEK_API_KEY")
     if not s.admin_token:
         missing.append("ADMIN_TOKEN")
+    if s.secret_key == "dev-insecure-secret" or len(s.secret_key) < 32:
+        missing.append("SECRET_KEY(32자 이상 임의 문자열)")
     if not s.session_cookie_secure:
         missing.append("SESSION_COOKIE_SECURE=true(HTTPS 전용 쿠키)")
     if not s.smtp_host:

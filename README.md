@@ -87,6 +87,7 @@ $env:TEST_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/test"
 |---|---|
 | `DEEPSEEK_API_KEY` | 없으면 챗봇이 규칙기반으로 조용히 저하됨 |
 | `ADMIN_TOKEN` | `/admin/*`(크롤·재색인 트리거) 보호. 없으면 누구나 실행 가능 |
+| `SECRET_KEY` | 이메일 인증·수신 거부 링크 서명. 기본값이거나 32자 미만이면 실패 |
 | `DATABASE_URL` | PostgreSQL이어야 pgvector 검색이 켜짐 |
 | `CORS_ORIGINS` | localhost가 남아 있으면 실패. 실제 도메인만 허용 |
 | `SESSION_COOKIE_SECURE` | `true` 여야 함. false면 세션 쿠키가 평문으로 오간다 |
@@ -100,6 +101,32 @@ $env:TEST_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/test"
 | `/ready` | readiness. DB 확인 후 실패 시 **503**. LLM 가용 여부도 보고 |
 
 로드밸런서 타겟그룹은 `/ready`를 봐야 한다. `/health`만 보면 DB가 죽어도 트래픽이 계속 들어온다.
+
+### 서버 1대 + Vercel + Supabase 배포
+프론트는 Vercel, 백엔드는 서버 1대(Docker Compose: 백엔드 + Caddy), DB는 Supabase를 쓴다.
+
+**서버** (Ubuntu 기준, 80·443 포트 개방)
+```bash
+# 메모리 1GB급이면 스왑부터 잡는다(이미지 빌드 중 메모리 부족 방지)
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+curl -fsSL https://get.docker.com | sudo sh
+git clone <저장소 주소> app && cd app
+nano .env                      # 운영 필수 환경변수 + DOMAIN=<백엔드 도메인>
+sudo docker compose up -d --build
+sudo docker compose exec backend python -m app.scripts.init_all --scholarships crawl   # 최초 1회
+curl https://<백엔드 도메인>/ready
+```
+컨테이너는 시작할 때마다 `alembic upgrade head`를 먼저 실행한다. 코드 갱신은
+`git pull && sudo docker compose up -d --build`.
+
+**Vercel**: Root Directory를 `frontend`로 지정하고 `VITE_KAKAO_MAP_KEY`를 넣는다.
+`frontend/vercel.json`의 `BACKEND_DOMAIN`을 백엔드 도메인으로 바꿔야 `/api`가 백엔드로 전달된다.
+`VITE_API_BASE`는 비워 둔다(같은 출처라 세션 쿠키 설정을 바꿀 필요가 없다).
+
+**Supabase**: `DATABASE_URL`에는 Session pooler 주소를 쓴다(직접 연결 주소는 IPv6 전용).
+`postgresql://`을 `postgresql+psycopg://`로 바꿔 넣는다.
 
 ### 인스턴스를 2대 이상 띄울 때 (미해결)
 현재 코드는 **웹 인스턴스 1대 / uvicorn 워커 1개**를 전제한다.
@@ -122,7 +149,9 @@ $env:TEST_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/test"
 | GET | `/community/hot` · `/community/best` · `/community/me/{posts,commented,scraps}` | HOT·BEST·내 활동 |
 | POST | `/community/posts` · `/community/posts/{id}/comments` | 글쓰기 · 댓글(대댓글 1단계) |
 | POST | `/community/posts/{id}/{like,scrap,report}` | 공감·스크랩·신고 토글 |
-| POST | `/auth/signup` · `/auth/login` · `/auth/logout` · GET `/auth/me` | 회원가입·로그인·로그아웃·세션 확인 |
+| POST | `/auth/signup` · `/auth/login` · `/auth/logout` · GET `/auth/me` | 회원가입(개인정보 동의 필수)·로그인·로그아웃·세션 확인 |
+| POST | `/auth/email/verify` · `/auth/email/resend` · `/auth/reminders/unsubscribe` | 이메일 인증·인증 메일 재발송·알림 수신 거부 |
+| GET | `/admin/moderation/reports` · DELETE `/admin/moderation/{posts,comments}/{id}` | 신고 목록·글과 댓글 삭제·신고 기각 (**`X-Admin-Token` 필요**) |
 | PUT | `/auth/profile` | 프로필 부분 수정(온보딩 설정·매칭 조건) |
 | PUT | `/auth/password` · DELETE `/auth/sessions` · POST `/auth/delete` | 비밀번호 변경·전 기기 로그아웃·회원 탈퇴 |
 | POST | `/auth/password/forgot` · `/auth/password/reset` | 재설정 링크 발송·토큰으로 재설정 |
@@ -245,6 +274,6 @@ $env:TEST_DATABASE_URL="postgresql+psycopg://user:pass@localhost:5432/test"
 
 ## 미구현/후속(TODO)
 - 매장별·기간별 실제 프로모션 데이터 수집(현재 간편결제 시드는 동일 할인율 예시)
-- 사용자 인증과 localStorage 프로필의 서버 이전
-- Alembic 마이그레이션, 마감 리마인더 알림
-- 관리형 PostgreSQL + pgvector 배포 구성
+- 관리자 화면(지금은 `/admin/*` API를 직접 호출한다)
+- 이미지로만 된 공고의 OCR
+- 임베딩 기반 검색(임베딩은 저장만 하고 추천은 조건 매칭으로 한다)

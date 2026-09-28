@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, false, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
@@ -29,6 +29,16 @@ class User(Base):
     # scrypt 해시. 'scrypt$n$r$p$salt$hash' 형식(app.core.security 참고).
     # 익명 사용자는 계정이 없으므로 nullable 이다.
     password_hash: Mapped[str | None] = mapped_column(String(255))
+
+    # 인증 메일의 링크를 눌렀거나 비밀번호 재설정을 마친 시각. NULL이면 이 주소가
+    # 본인 것인지 모른다. 그런 주소로는 알림 메일을 보내지 않는다.
+    email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # 마감 알림 메일 수신 동의. 기본은 꺼짐이고 가입·마이페이지에서 직접 켠다.
+    reminder_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
+    # 개인정보 수집·이용에 동의한 시각. 동의 없이는 가입할 수 없다.
+    privacy_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # --- 장학금 매칭용 프로필 ---
     income_bracket: Mapped[int | None] = mapped_column(Integer)   # 소득분위 0~10

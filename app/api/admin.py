@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -111,3 +111,115 @@ def list_offer_reports(
         )
         for offer, store, cnt in rows
     ]
+
+
+# --- 커뮤니티 신고 처리 ---
+# 신고는 쌓이기만 하고 볼 방법이 없었다. 익명 게시판에서는 이 목록과 삭제
+# 권한이 운영자의 유일한 개입 수단이다. 자동 숨김은 하지 않는다. 몇 명이
+# 몰려 신고하면 정상 글이 사라지기 때문에 마지막 판단은 사람이 한다.
+moderation_router = APIRouter(
+    prefix="/admin/moderation",
+    tags=["admin"],
+    dependencies=[Depends(require_admin)],
+)
+
+
+class ReportedItem(BaseModel):
+    kind: str  # "post" | "comment"
+    id: int
+    post_id: int
+    title: str | None = None
+    excerpt: str
+    report_count: int
+    reasons: list[str]
+    created_at: datetime | None = None
+
+
+@moderation_router.get("/reports", response_model=list[ReportedItem])
+def list_reported(min_count: int = 1, db: Session = Depends(get_db)) -> list[ReportedItem]:
+    """신고가 쌓인 글·댓글. 많이 신고된 순. 이미 삭제된 것은 빼고 보여준다."""
+    from sqlalchemy import func
+
+    from app.models.community import Comment, Post, Report
+
+    items: list[ReportedItem] = []
+    for model, fk, kind in ((Post, Report.post_id, "post"), (Comment, Report.comment_id, "comment")):
+        rows = db.execute(
+            select(model, func.count(Report.id))
+            .join(Report, fk == model.id)
+            .where(model.deleted_at.is_(None))
+            .group_by(model.id)
+            .having(func.count(Report.id) >= min_count)
+        ).all()
+        for row, cnt in rows:
+            reasons = db.scalars(select(Report.reason).where(fk == row.id)).all()
+            items.append(
+                ReportedItem(
+                    kind=kind,
+                    id=row.id,
+                    post_id=row.id if kind == "post" else row.post_id,
+                    title=getattr(row, "title", None),
+                    excerpt=(row.body or "")[:200],
+                    report_count=cnt,
+                    reasons=list(reasons),
+                    created_at=row.created_at,
+                )
+            )
+    items.sort(key=lambda i: i.report_count, reverse=True)
+    return items
+
+
+@moderation_router.delete("/posts/{post_id}", status_code=204, response_class=Response)
+def remove_post(post_id: int, db: Session = Depends(get_db)) -> Response:
+    """글 삭제. 작성자 본인 삭제와 같은 소프트 삭제라 댓글 흐름은 남는다."""
+    from datetime import timezone
+
+    from fastapi import HTTPException
+
+    from app.api.community import _image_path
+    from app.models.community import Post
+
+    post = db.get(Post, post_id)
+    if post is None or post.deleted_at is not None:
+        raise HTTPException(404, "글을 찾을 수 없습니다.")
+    post.deleted_at = datetime.now(timezone.utc)
+    names, post.image_names = post.image_names or [], []
+    db.commit()
+    for name in names:
+        _image_path(name).unlink(missing_ok=True)
+    return Response(status_code=204)
+
+
+@moderation_router.delete("/comments/{comment_id}", status_code=204, response_class=Response)
+def remove_comment(comment_id: int, db: Session = Depends(get_db)) -> Response:
+    from datetime import timezone
+
+    from fastapi import HTTPException
+
+    from app.models.community import Comment, Post
+
+    comment = db.get(Comment, comment_id)
+    if comment is None or comment.deleted_at is not None:
+        raise HTTPException(404, "댓글을 찾을 수 없습니다.")
+    comment.deleted_at = datetime.now(timezone.utc)
+    post = db.get(Post, comment.post_id)
+    if post and post.comment_count > 0:
+        post.comment_count -= 1
+    db.commit()
+    return Response(status_code=204)
+
+
+@moderation_router.delete("/{kind}/{item_id}/reports", status_code=204, response_class=Response)
+def dismiss_reports(kind: str, item_id: int, db: Session = Depends(get_db)) -> Response:
+    """문제없는 글이면 신고를 기각한다. 작성자 등급 강등도 함께 풀린다."""
+    from fastapi import HTTPException
+    from sqlalchemy import delete
+
+    from app.models.community import Report
+
+    column = {"posts": Report.post_id, "comments": Report.comment_id}.get(kind)
+    if column is None:
+        raise HTTPException(404, "posts 또는 comments 만 가능합니다.")
+    db.execute(delete(Report).where(column == item_id))
+    db.commit()
+    return Response(status_code=204)

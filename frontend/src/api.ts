@@ -220,11 +220,14 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
 export async function signup(
   email: string,
   password: string,
-  claimUserId?: string | null
+  claimUserId: string | null | undefined,
+  consent: { privacy: boolean; reminders: boolean }
 ): Promise<AuthUser> {
   const res = await authRequest("/auth/signup", {
     email,
     password,
+    privacy_consent: consent.privacy,
+    reminder_opt_in: consent.reminders,
     // 로그인 도입 전 이 브라우저에 쌓인 데이터를 새 계정으로 승계한다.
     claim_user_id: claimUserId ?? null,
   });
@@ -236,6 +239,22 @@ export async function login(email: string, password: string): Promise<AuthUser> 
   const res = await authRequest("/auth/login", { email, password });
   if (!res.ok) throw new Error(await readError(res, "로그인에 실패했습니다."));
   return (await res.json()) as AuthUser;
+}
+
+/** 메일 링크 처리. kind 는 링크 종류(이메일 인증 / 알림 수신 거부). */
+export async function submitMailLink(
+  kind: "verify" | "unsubscribe",
+  token: string
+): Promise<void> {
+  const path = kind === "verify" ? "/auth/email/verify" : "/auth/reminders/unsubscribe";
+  const res = await authRequest(path, { token });
+  if (!res.ok) throw new Error(await readError(res, "링크를 처리하지 못했습니다."));
+}
+
+/** 인증 메일 다시 보내기. */
+export async function resendVerification(): Promise<void> {
+  const res = await authRequest("/auth/email/resend", {});
+  if (!res.ok) throw new Error(await readError(res, "메일을 보내지 못했습니다."));
 }
 
 export async function logout(): Promise<void> {
@@ -256,6 +275,7 @@ export async function updateProfile(
     benefit_programs: string[];
     income_bracket: number | null;
     gpa: number | null;
+    reminder_enabled: boolean;
   }>
 ): Promise<AuthUser> {
   const res = await fetch(`${API_BASE}/auth/profile`, {

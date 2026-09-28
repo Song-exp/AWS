@@ -61,7 +61,7 @@ def answer_question(db: Session, req: QARequest) -> QAResponse:
 
     if not scholarships:
         return QAResponse(
-            answer="확인된 8월 마감 장학금이 없습니다. 프로필을 조정하거나 나중에 다시 확인해 주세요.",
+            answer="조건에 맞는 모집 중 장학금을 찾지 못했습니다. 프로필을 조정하거나 나중에 다시 확인해 주세요.",
             citations=[],
             grounded=False,
         )

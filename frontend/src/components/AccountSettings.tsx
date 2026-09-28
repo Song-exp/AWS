@@ -1,16 +1,24 @@
 import { useState } from "react";
-import { changePassword, deleteAccount, logoutEverywhere } from "../api";
+import {
+  changePassword,
+  deleteAccount,
+  logoutEverywhere,
+  resendVerification,
+  updateProfile,
+} from "../api";
 import type { AuthUser } from "../types";
 
 interface Props {
   user: AuthUser;
+  /** 알림 설정처럼 계정 값이 바뀌면 앱이 들고 있는 사용자 정보도 갱신한다. */
+  onUserChange: (user: AuthUser) => void;
   /** 세션이 끊긴 뒤 앱을 로그인 화면으로 되돌린다. */
   onSignedOut: () => void;
 }
 
 const MIN_PASSWORD_LENGTH = 8;
 
-export default function AccountSettings({ user, onSignedOut }: Props) {
+export default function AccountSettings({ user, onUserChange, onSignedOut }: Props) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [deletePassword, setDeletePassword] = useState("");
@@ -43,6 +51,46 @@ export default function AccountSettings({ user, onSignedOut }: Props) {
 
       {message && <p className="notice success">{message}</p>}
       {error && <p className="notice error" role="alert">{error}</p>}
+
+      <div className="account-block">
+        <h3>마감 알림 메일</h3>
+        <p className="account-desc">
+          신청 마감이 7일·3일·1일 남은 맞춤 공고를 메일로 알려드려요.
+          {user.reminder_enabled ? " 지금은 켜져 있어요." : " 지금은 꺼져 있어요."}
+        </p>
+        {!user.email_verified && (
+          <>
+            <p className="account-desc">
+              이메일 인증을 마쳐야 알림이 발송돼요. 가입할 때 받은 메일의
+              링크를 눌러주세요.
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                run(resendVerification, "인증 메일을 다시 보냈어요. 메일함을 확인해주세요.")
+              }
+            >
+              인증 메일 다시 받기
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() =>
+            run(
+              async () =>
+                onUserChange(
+                  await updateProfile({ reminder_enabled: !user.reminder_enabled })
+                ),
+              user.reminder_enabled ? "알림 메일을 껐어요." : "알림 메일을 켰어요."
+            )
+          }
+        >
+          {user.reminder_enabled ? "알림 끄기" : "알림 켜기"}
+        </button>
+      </div>
 
       <form
         className="account-block"

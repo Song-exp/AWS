@@ -8,6 +8,7 @@ import type { AuthUser, MyApplication, MyPageData, SavingSummary, UserProfileLoc
 interface Props {
   profile: UserProfileLocal | null;
   user: AuthUser;
+  onUserChange: (user: AuthUser) => void;
   onSignedOut: () => void;
 }
 
@@ -31,7 +32,7 @@ const RANKED_PERSONAS = [...DEMO_PERSONAS].sort(
 
 const formatWon = (amount: number) => `${amount.toLocaleString("ko-KR")}원`;
 
-export default function MyPage({ profile, user, onSignedOut }: Props) {
+export default function MyPage({ profile, user, onUserChange, onSignedOut }: Props) {
   const [data, setData] = useState<MyPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +115,7 @@ export default function MyPage({ profile, user, onSignedOut }: Props) {
 
       <div className="mypage-body">
         {tab === "account" && (
-          <AccountSettings user={user} onSignedOut={onSignedOut} />
+          <AccountSettings user={user} onUserChange={onUserChange} onSignedOut={onSignedOut} />
         )}
 
         {tab === "savings" && (

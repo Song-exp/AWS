@@ -236,6 +236,20 @@ def run_crawler(crawler: BaseCrawler, db: Session) -> dict:
 
 def run_daily_update(db: Session, trigger: str = "scheduled") -> CrawlRun:
     """일간 갱신 진입점: 마감 삭제 -> 소스별 수집·추가 -> CrawlRun 이력 기록."""
+    # 크롤 도중 프로세스가 죽으면 기록이 RUNNING 으로 영원히 남는다. 정상 실행은
+    # 몇 분이면 끝나므로 1시간 넘게 RUNNING 인 것은 죽은 실행으로 본다.
+    db.execute(
+        update(CrawlRun)
+        .where(
+            CrawlRun.status == CrawlRunStatus.RUNNING,
+            CrawlRun.started_at < datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+        .values(
+            status=CrawlRunStatus.FAILED,
+            error="실행 도중 중단됨(프로세스 종료)",
+            finished_at=datetime.now(timezone.utc),
+        )
+    )
     run = CrawlRun(trigger=trigger, status=CrawlRunStatus.RUNNING)
     db.add(run)
     db.commit()

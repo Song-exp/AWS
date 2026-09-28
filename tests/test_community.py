@@ -35,7 +35,7 @@ def boards(db):
 
 def _login_as(client, creds):
     client.cookies.clear()
-    r = client.post("/auth/signup", json={"email": creds[0], "password": creds[1]})
+    r = client.post("/auth/signup", json={"privacy_consent": True, "email": creds[0], "password": creds[1]})
     if r.status_code == 409:
         r = client.post("/auth/login", json={"email": creds[0], "password": creds[1]})
     assert r.status_code in (200, 201), r.text

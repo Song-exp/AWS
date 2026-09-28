@@ -10,7 +10,7 @@ NEW_PASSWORD = "brand-new-pass-9"
 
 def _signup(client, email=EMAIL, password=PASSWORD):
     client.cookies.clear()
-    r = client.post("/auth/signup", json={"email": email, "password": password})
+    r = client.post("/auth/signup", json={"privacy_consent": True, "email": email, "password": password})
     assert r.status_code == 201
     return r.json()
 
@@ -199,7 +199,7 @@ def test_email_is_reusable_after_deletion(client):
     client.post("/auth/delete", json={"password": PASSWORD})
 
     client.cookies.clear()
-    r = client.post("/auth/signup", json={"email": EMAIL, "password": PASSWORD})
+    r = client.post("/auth/signup", json={"privacy_consent": True, "email": EMAIL, "password": PASSWORD})
     assert r.status_code == 201
 
 

@@ -46,6 +46,8 @@ class OfferOut(BaseModel):
     #: '이미 끝난 혜택이에요' 제보 수. 임계를 넘으면 프론트가 흐리게 표시한다.
     report_count: int = 0
     reported: bool = False
+    #: 확인되지 않은 예시 값. 프론트가 '예시' 뱃지를 붙인다.
+    is_sample: bool = False
 
     class Config:
         from_attributes = True

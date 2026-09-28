@@ -1,0 +1,14 @@
+.git
+.venv
+frontend
+tests
+**/__pycache__
+**/node_modules
+.env
+.env.*
+data/*.db*
+data/uploads
+data/backup-*
+*.pptx
+*.pdf
+*.gif

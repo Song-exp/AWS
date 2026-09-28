@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { installBackGuard, useNavState } from "./useNavState";
 import AuthPage from "./pages/AuthPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import MailLinkPage from "./pages/MailLinkPage";
 import ChatPage from "./pages/ChatPage";
 import CommunityPage from "./pages/CommunityPage";
 import MapPage from "./pages/MapPage";
@@ -196,6 +197,28 @@ export default function App() {
     window.history.replaceState(window.history.state, "", window.location.pathname);
   }
 
+  // 이메일 인증(?verify_token=)과 알림 수신 거부(?unsubscribe_token=) 링크.
+  const [mailLink, setMailLink] = useState<{
+    kind: "verify" | "unsubscribe";
+    token: string;
+  } | null>(() => {
+    const query = new URLSearchParams(window.location.search);
+    const verify = query.get("verify_token");
+    const unsubscribe = query.get("unsubscribe_token");
+    if (verify) return { kind: "verify", token: verify };
+    if (unsubscribe) return { kind: "unsubscribe", token: unsubscribe };
+    return null;
+  });
+
+  function clearMailLink() {
+    setMailLink(null);
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+    // 인증 여부·알림 설정이 바뀌었을 수 있으니 로그인 상태면 다시 읽는다.
+    fetchCurrentUser()
+      .then((fresh) => fresh && setUser(fresh))
+      .catch(() => undefined);
+  }
+
   // 첫 화면에서 뒤로가기를 눌러도 앱 밖(이전 사이트)으로 나가지 않게 한다.
   useEffect(() => installBackGuard(), []);
 
@@ -324,6 +347,13 @@ export default function App() {
     return <ResetPasswordPage token={resetToken} onDone={clearResetToken} />;
   }
 
+  // 메일 링크는 다른 기기에서 열 수 있으므로 로그인 여부와 무관하게 처리한다.
+  if (mailLink) {
+    return (
+      <MailLinkPage kind={mailLink.kind} token={mailLink.token} onDone={clearMailLink} />
+    );
+  }
+
   if (!user) {
     return (
       <AuthPage
@@ -404,6 +434,7 @@ export default function App() {
           <MyPage
             profile={profile}
             user={user}
+            onUserChange={setUser}
             onSignedOut={() => {
               setUser(null);
               setOnboarding(true);
