@@ -24,6 +24,7 @@ from app.crawlers.public import KhuScholarshipCrawler, OnjungchoungnyeonCrawler
 from app.models.application import UserApplication
 from app.models.crawl_run import CrawlRun, CrawlRunStatus
 from app.models.scholarship import PostingStatus, Scholarship, ScholarshipEmbedding
+from app.utils.text import strip_nul
 
 logger = logging.getLogger(__name__)
 
@@ -88,8 +89,26 @@ def _to_model(raw: RawPosting) -> Scholarship:
     )
 
 
+def _scrub(raw: RawPosting) -> None:
+    """저장 전에 NUL 바이트를 지운다.
+
+    PostgreSQL 은 text·jsonb 에 NUL 을 담지 못해 트랜잭션이 통째로 실패한다.
+    PDF·한글 문서 추출과 외부 API 응답에서 섞여 들어온다. 여기서 한 번 걸러야
+    신규 저장과 갱신, 변경 감지 해시가 모두 같은 값을 보게 된다.
+    """
+    for field in ("title", "organization", "body_text", "source_url", "deadline_raw"):
+        value = getattr(raw, field, None)
+        if isinstance(value, str):
+            setattr(raw, field, strip_nul(value))
+    for field in ("eligibility", "benefit", "required_documents"):
+        value = getattr(raw, field, None)
+        if value is not None:
+            setattr(raw, field, strip_nul(value))
+
+
 def upsert_posting(db: Session, raw: RawPosting) -> bool:
     """content_key 기준 멱등 upsert. 신규 저장 시 True."""
+    _scrub(raw)
     existing = db.scalar(
         select(Scholarship).where(Scholarship.content_key == raw.content_key())
     )

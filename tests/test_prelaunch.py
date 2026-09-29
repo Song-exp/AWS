@@ -583,3 +583,55 @@ def test_stripping_does_not_eat_other_numbers(text):
     from app.utils.pii import strip_rrn
 
     assert strip_rrn(text) == text
+
+
+# ---------------- NUL 바이트 ----------------
+def test_nul_bytes_are_stripped_before_saving_postings(db):
+    """PostgreSQL 은 text·jsonb 에 NUL 을 담지 못한다. 넣으려 하면 트랜잭션이
+    통째로 실패한다. SQLite 는 받아주므로 로컬에서는 드러나지 않는다."""
+    from app.crawlers.base import RawPosting
+    from app.crawlers.registry import upsert_posting
+    from app.models.scholarship import Category, Scholarship, SourceType
+
+    raw = RawPosting(
+        source_platform="test",
+        source_url="https://example.test/nul\x00",
+        title="제목\x00에 섞임",
+        organization="기관\x00",
+        source_type=SourceType.PRIVATE,
+        category=Category.SCHOLARSHIP,
+        body_text="본문\x00에도 섞임",
+        eligibility={"scope": "재학생\x00", "tags": ["가\x00나"]},
+        benefit={"amount_desc": "100만원\x00"},
+        required_documents=["서류\x00"],
+    )
+    assert upsert_posting(db, raw) is True
+    db.commit()
+
+    row = db.scalars(select(Scholarship)).one()
+    blob = f"{row.title}{row.organization}{row.body_text}{row.source_url}"
+    blob += f"{row.eligibility}{row.benefit}{row.required_documents}"
+    assert "\x00" not in blob
+    assert row.title == "제목에 섞임"
+    assert row.eligibility["tags"] == ["가나"]
+
+
+def test_nul_bytes_are_stripped_from_uploaded_documents(auth_client, db):
+    """업로드 문서는 크롤 첨부와 같은 파서를 쓴다. 같은 문제를 받는다."""
+    from app.models.application import ApplicationDocument
+
+    r = auth_client.post(
+        "/applications/upload",
+        data={"scholarship_name": "테스트"},
+        files={"file": ("a.txt", "본문\x00입니다".encode("utf-8"), "text/plain")},
+    )
+    assert r.status_code == 200, r.text
+    text = db.scalars(select(ApplicationDocument.content_text)).one()
+    assert "\x00" not in text and text == "본문입니다"
+
+
+def test_strip_nul_leaves_other_text_alone():
+    from app.utils.text import strip_nul
+
+    assert strip_nul("정상 텍스트") == "정상 텍스트"
+    assert strip_nul({"a": ["x"], "n": 3, "b": None}) == {"a": ["x"], "n": 3, "b": None}

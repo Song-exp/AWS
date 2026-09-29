@@ -119,8 +119,11 @@ class ApplicationDocument(Base):
         지나므로 여기서 한 번만 막는다. DB에서 읽어올 때는 호출되지 않는다.
         """
         from app.utils.pii import strip_rrn
+        from app.utils.text import strip_nul
 
-        return strip_rrn(value)
+        # NUL 은 PostgreSQL text 컬럼이 받지 못한다. PDF·한글 문서 추출에서
+        # 섞여 들어오므로 같은 지점에서 함께 지운다.
+        return strip_nul(strip_rrn(value))
 
 
 class DocumentEmbedding(Base):

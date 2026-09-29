@@ -228,6 +228,29 @@ Caddy가 `X-Forwarded-For`를 실제 접속 IP로 덮어쓴다. 클라이언트�
 호출 상한 카운터는 프로세스 메모리에 있다. 인스턴스를 늘리면 실효 상한이 그만큼 늘어난다.
 서버 1대 구성에서는 문제가 없다.
 
+### PostgreSQL 에서 처음 드러난 것
+
+로컬은 SQLite 라서 배포 후에야 나타난 문제가 두 가지 있었다. 둘 다 고쳤다.
+
+| 문제 | 원인 | 조치 |
+|---|---|---|
+| `spend_category` 타입이 없어 마이그레이션 실패 | `create_table` 은 Alembic 이 ENUM 타입을 만들어 주지만 `add_column` 은 만들어 주지 않는다 | 마이그레이션이 타입을 직접 만든다 |
+| `NUL (0x00) bytes` 로 크롤 저장 실패 | PostgreSQL 은 text·jsonb 에 NUL 을 담지 못한다. PDF·한글 문서 추출과 외부 API 응답에서 섞여 들어온다 | 저장 지점에서 제거한다 |
+
+**이미 배포한 서버에서 enum 을 손으로 만들었다면 값을 확인해야 한다.** 코드가
+기대하는 값은 `FOOD, TRANSPORT, CULTURE, STUDY, LIVING, FIXED, FINANCE` 다.
+다르면 그 값을 쓰는 저장이 실패한다. Supabase SQL 편집기에서 확인하고 고친다.
+
+```sql
+SELECT enum_range(NULL::spend_category);
+
+-- 빠진 값이 있으면 추가한다(PostgreSQL 은 값 삭제를 지원하지 않는다)
+ALTER TYPE spend_category ADD VALUE IF NOT EXISTS 'CULTURE';
+ALTER TYPE spend_category ADD VALUE IF NOT EXISTS 'STUDY';
+ALTER TYPE spend_category ADD VALUE IF NOT EXISTS 'FIXED';
+ALTER TYPE spend_category ADD VALUE IF NOT EXISTS 'FINANCE';
+```
+
 ### 검증하지 못한 것
 
 | 항목 | 확인 방법 |
