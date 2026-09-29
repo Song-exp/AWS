@@ -53,9 +53,19 @@
 | `docker-compose.yml` | 백엔드와 Caddy, 볼륨 `uploads`·`caddy_data` |
 | `Caddyfile` | `DOMAIN` 환경변수의 도메인으로 HTTPS, 백엔드로 프록시 |
 | `.dockerignore` | 가상환경, 프론트엔드, DB 파일, 환경변수 파일 제외 |
-| `frontend/vercel.json` | `/api` 리라이트. `BACKEND_DOMAIN`을 실제 도메인으로 교체해야 함 |
+| `frontend/vercel.json` | `/api` 를 백엔드로 전달. `tmoneyi.duckdns.org` 로 채워져 있다 |
 | `requirements.txt` | 쓰지 않는 scrapy, playwright 제거 |
 | `migrations/versions/55aebbb81c21_initial_schema.py` | PostgreSQL에서 pgvector 확장을 먼저 생성 |
+
+## 3-1. 이번 배포의 실제 값
+
+| 항목 | 값 |
+|---|---|
+| 백엔드 도메인 | `tmoneyi.duckdns.org` |
+| 서버 공인 IP | `223.130.133.192` |
+| 프론트 도메인 | Vercel 프로젝트 생성 후 결정 |
+
+`frontend/vercel.json` 의 리라이트 대상은 이 도메인으로 채워져 있다.
 
 ## 4. 환경변수
 
@@ -64,12 +74,12 @@
 저장소에 올리지 않는다. 서버에서 직접 작성한다.
 
 ```
-DOMAIN=<백엔드 도메인>.duckdns.org
+DOMAIN=tmoneyi.duckdns.org
 
 APP_ENV=production
 DATABASE_URL=postgresql+psycopg://postgres.<프로젝트ID>:<비밀번호>@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
-CORS_ORIGINS=https://<프로젝트>.vercel.app
-APP_BASE_URL=https://<프로젝트>.vercel.app
+CORS_ORIGINS=https://<Vercel 주소>
+APP_BASE_URL=https://<Vercel 주소>
 SESSION_COOKIE_SECURE=true
 ADMIN_TOKEN=<긴 임의 문자열>
 SECRET_KEY=<32자 이상 임의 문자열>
@@ -108,16 +118,19 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 - [ ] Ubuntu Micro 서버 생성, 공인 IP 할당
 - [ ] ACG에서 22, 80, 443 포트 개방
 - [ ] DuckDNS 서브도메인 생성, 서버 공인 IP 연결
-- [ ] Supabase 프로젝트 생성(서울 리전), DB 비밀번호는 영문과 숫자만
-- [ ] Supabase Session pooler 주소 복사
+- [ ] Supabase 프로젝트 생성, Session pooler 주소 복사
+  - 리전은 서버와 같은 서울(`ap-northeast-2`)로 맞춘다. 다른 대륙이면 쿼리마다
+    왕복 지연이 붙고 처리방침의 '처리 위치'도 국외로 고쳐야 한다. 생성 후에는
+    바꿀 수 없어 프로젝트를 새로 만들어야 한다
+  - 비밀번호에 `@ / : ? # % * 공백` 이 들어 있으면 주소 문법이 깨진다. URL
+    인코딩하거나(`/`는 `%2F`, `*`는 `%2A`) 영문·숫자로만 다시 만든다
 - [ ] Gmail 2단계 인증 설정, 앱 비밀번호 발급
 
 ### 코드
 
-- [ ] `frontend/public/privacy.html`의 표시된 네 곳 채우기: 시행일, 운영자 이름, 보호책임자 이름, 문의 이메일
+- [ ] `frontend/public/privacy.html`의 문의 이메일 채우기(나머지는 기입 완료)
 - [ ] 처리방침의 위탁 업체 표가 실제 구성과 같은지 확인
 - [ ] 간편결제 혜택을 실제 값으로 교체. 교체 전에는 화면에 예시로 표시된다
-- [ ] `frontend/vercel.json`의 `BACKEND_DOMAIN`을 백엔드 도메인으로 교체
 - [ ] 배포 파일 커밋 후 push
 
 ### 서버
@@ -135,7 +148,7 @@ sudo docker compose up -d --build
 # 최초 1회: 시드와 크롤
 sudo docker compose exec backend python -m app.scripts.init_all --scholarships crawl
 
-curl https://<백엔드 도메인>/ready
+curl https://tmoneyi.duckdns.org/ready
 ```
 
 코드 갱신:
@@ -181,7 +194,7 @@ git pull && sudo docker compose up -d --build
 | 신고 기각 | `DELETE /admin/moderation/posts/{id}/reports` 또는 `comments` |
 
 ```bash
-curl -H "X-Admin-Token: $ADMIN_TOKEN" https://<백엔드 도메인>/admin/moderation/reports
+curl -H "X-Admin-Token: $ADMIN_TOKEN" https://tmoneyi.duckdns.org/admin/moderation/reports
 ```
 
 ### 간편결제 혜택을 실제 값으로 바꾸기

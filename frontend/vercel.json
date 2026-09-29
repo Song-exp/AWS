@@ -1,5 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://BACKEND_DOMAIN/:path*" }
+    { "source": "/api/:path*", "destination": "https://tmoneyi.duckdns.org/:path*" }
   ]
 }
