@@ -103,6 +103,11 @@ async def upload_in_chat(
     except UnsupportedFileType as e:
         os.remove(dest)  # 거절한 파일을 디스크에 남기지 않는다
         raise HTTPException(status_code=415, detail=str(e))
+    finally:
+        # 추출 후에는 원본을 다시 읽지 않는다. 주민번호 등이 남아 있는 파일을
+        # 계속 들고 있지 않기 위해 지운다.
+        if os.path.exists(dest):
+            os.remove(dest)
 
     if not text.strip():
         os.remove(dest)
@@ -119,7 +124,7 @@ async def upload_in_chat(
         user_id=sess.user_id,
         scholarship_name=f"첨부: {original}",
         source=ApplicationSource.UPLOADED,
-        source_file_path=dest,
+        source_file_path=None,  # 원본은 추출 직후 삭제한다
         is_reusable=True,
     )
     app_row.documents.append(

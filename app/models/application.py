@@ -22,7 +22,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.core.config import settings
 from app.core.db import Base
@@ -109,6 +109,18 @@ class ApplicationDocument(Base):
     embeddings: Mapped[list["DocumentEmbedding"]] = relationship(
         back_populates="document", cascade="all, delete-orphan"
     )
+
+    @validates("content_text")
+    def _strip_rrn(self, _key: str, value: str) -> str:
+        """저장 직전에 주민등록번호를 지운다.
+
+        본문이 들어오는 경로는 업로드 추출·직접 작성·수정 세 군데다. 각 경로에
+        따로 붙이면 새 경로가 생길 때 빠뜨린다. 모든 경로가 이 속성 대입을
+        지나므로 여기서 한 번만 막는다. DB에서 읽어올 때는 호출되지 않는다.
+        """
+        from app.utils.pii import strip_rrn
+
+        return strip_rrn(value)
 
 
 class DocumentEmbedding(Base):

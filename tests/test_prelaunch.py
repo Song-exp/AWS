@@ -504,3 +504,82 @@ def test_crawler_attachment_zip_bomb_is_rejected(monkeypatch):
 
     with pytest.raises(fp.UnsupportedFileType):
         fp.extract_text_from_bytes(buf.getvalue(), "attach.docx")
+
+
+# ---------------- 주민등록번호 비보관 ----------------
+def test_resident_number_is_not_stored(auth_client, db):
+    """주민등록번호는 법령 근거 없이 보관할 수 없다. 물어보지 않지만 올린
+    신청서 안에 들어 있을 수 있어 저장 전에 지운다."""
+    from app.models.application import ApplicationDocument
+
+    body = "저는 990101-1234567 입니다. 학번 2020123456, 계좌 1002-345-678901."
+    r = auth_client.post(
+        "/applications/upload",
+        data={"scholarship_name": "테스트 장학금"},
+        files={"file": ("intro.txt", body.encode("utf-8"), "text/plain")},
+    )
+    assert r.status_code == 200, r.text
+
+    text = "\n".join(db.scalars(select(ApplicationDocument.content_text)).all())
+    assert text, "문서가 저장되지 않았다"
+    assert "990101-1234567" not in text
+    # 학번·계좌처럼 초안의 근거가 되는 숫자는 남아야 한다
+    assert "2020123456" in text and "1002-345-678901" in text
+
+
+def test_uploaded_original_file_is_not_kept(auth_client, db):
+    """원본 파일에는 지운 번호가 그대로 남아 있다. 다시 읽는 곳도 없다."""
+    import os
+
+    from app.core.config import settings
+    from app.models.application import UserApplication
+
+    before = set(os.listdir(settings.upload_dir)) if os.path.isdir(settings.upload_dir) else set()
+    r = auth_client.post(
+        "/applications/upload",
+        data={"scholarship_name": "테스트 장학금"},
+        files={"file": ("intro.txt", "본문 990101-1234567".encode("utf-8"), "text/plain")},
+    )
+    assert r.status_code == 200, r.text
+
+    assert set(os.listdir(settings.upload_dir)) - before == set()
+    row = db.scalars(select(UserApplication)).first()
+    assert row.source_file_path is None
+
+
+def test_typed_and_edited_text_is_stripped_too(auth_client):
+    """업로드뿐 아니라 직접 작성·수정 경로도 같은 규칙을 지나야 한다."""
+    created = auth_client.post(
+        "/applications",
+        json={
+            "scholarship_name": "직접 작성",
+            "documents": [{"doc_type": "self_intro", "content_text": "제 번호 0012313456789"}],
+        },
+    )
+    assert created.status_code == 200, created.text
+    assert "0012313456789" not in str(created.json())
+
+    doc_id = created.json()["documents"][0]["id"]
+    edited = auth_client.put(
+        f"/me/applications/{created.json()['id']}/documents",
+        json={"documents": [{"id": doc_id, "content_text": "다시 011231-4567890 씁니다"}]},
+    )
+    assert edited.status_code == 200, edited.text
+    assert "011231-4567890" not in str(edited.json())
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "991301-1234567",   # 13월
+        "990132-1234567",   # 32일
+        "990101-9234567",   # 성별코드 9
+        "1234567890123",    # 날짜 형식이 아닌 13자리
+        "1002-345-678901",  # 계좌번호
+    ],
+)
+def test_stripping_does_not_eat_other_numbers(text):
+    """계좌·학번이 같이 지워지면 초안의 근거가 망가진다."""
+    from app.utils.pii import strip_rrn
+
+    assert strip_rrn(text) == text

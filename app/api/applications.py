@@ -52,13 +52,18 @@ async def upload_application(
     except UnsupportedFileType as e:
         os.remove(dest)  # 거절한 파일을 디스크에 남기지 않는다
         raise HTTPException(status_code=415, detail=str(e))
+    finally:
+        # 텍스트를 뽑은 뒤 원본을 다시 읽는 곳이 없다. 신청서 원본에는 주민번호
+        # 같은 값이 그대로 남아 있으니 들고 있지 않는다.
+        if os.path.exists(dest):
+            os.remove(dest)
 
     app_row = UserApplication(
         user_id=user.id,
         scholarship_name=scholarship_name,
         organization=organization,
         source=ApplicationSource.UPLOADED,
-        source_file_path=dest,
+        source_file_path=None,  # 원본은 추출 직후 삭제한다
     )
     app_row.documents.append(
         ApplicationDocument(
