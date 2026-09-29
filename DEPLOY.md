@@ -63,7 +63,8 @@
 |---|---|
 | 백엔드 도메인 | `tmoneyi.duckdns.org` |
 | 서버 공인 IP | `223.130.133.192` |
-| 프론트 도메인 | Vercel 프로젝트 생성 후 결정 |
+| 프론트 도메인 | `aws-coral-six.vercel.app` |
+| Supabase 리전 | 서울(`ap-northeast-2`) |
 
 `frontend/vercel.json` 의 리라이트 대상은 이 도메인으로 채워져 있다.
 
@@ -78,8 +79,8 @@ DOMAIN=tmoneyi.duckdns.org
 
 APP_ENV=production
 DATABASE_URL=postgresql+psycopg://postgres.<프로젝트ID>:<비밀번호>@aws-0-ap-northeast-2.pooler.supabase.com:5432/postgres
-CORS_ORIGINS=https://<Vercel 주소>
-APP_BASE_URL=https://<Vercel 주소>
+CORS_ORIGINS=https://aws-coral-six.vercel.app
+APP_BASE_URL=https://aws-coral-six.vercel.app
 SESSION_COOKIE_SECURE=true
 ADMIN_TOKEN=<긴 임의 문자열>
 SECRET_KEY=<32자 이상 임의 문자열>
@@ -119,6 +120,8 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 - [ ] ACG에서 22, 80, 443 포트 개방
 - [ ] DuckDNS 서브도메인 생성, 서버 공인 IP 연결
 - [ ] Supabase 프로젝트 생성, Session pooler 주소 복사
+  - Session pooler 주소는 대시보드에서 그대로 복사한다. 호스트 앞부분이
+    `aws-0` 인지 `aws-1` 인지 프로젝트마다 다르다
   - 리전은 서버와 같은 서울(`ap-northeast-2`)로 맞춘다. 다른 대륙이면 쿼리마다
     왕복 지연이 붙고 처리방침의 '처리 위치'도 국외로 고쳐야 한다. 생성 후에는
     바꿀 수 없어 프로젝트를 새로 만들어야 한다
