@@ -145,12 +145,14 @@ async def upload_in_chat(
         pass
 
     reply = chat_service.note_upload(db, sess.session_id, sess.user_id, original, len(text))
+    # 고른 공고가 있으면 note_upload 가 새 파일을 반영한 초안을 함께 돌려준다.
+    # 여기서 버리면 화면에 초안이 뜨지 않는다.
     return ChatMessageResponse(
         session_id=reply.session_id,
         state=reply.state,
         message=reply.message,
-        candidates=[],
-        draft=None,
+        candidates=reply.candidates or [],
+        draft=reply.draft,
         profile=reply.profile,
     )
 

@@ -386,9 +386,22 @@ def note_upload(db: Session, session_id: str | None, user_id: uuid.UUID | None,
     sess.uploaded_docs += 1
     sess.history.append(("user", f"(파일 첨부: {filename})"))
 
+    # 이미 고른 공고가 있으면 되묻지 않고 새 파일을 반영해 바로 다시 만든다.
+    # "초안을 만들 수 있어요" 라고 안내한 뒤 그 요청을 처리하지 못하는 것이
+    # 이 흐름의 막다른 길이었다.
+    if sess.selected_id:
+        reply = _do_draft(db, sess)
+        reply.message = (
+            f"'{filename}' 잘 받았어요. 본문 {text_len:,}자를 읽었어요.\n"
+            "이 내용까지 반영해 초안을 다시 만들었어요. "
+            "확인하시고 '저장'이라고 하면 보관해둘게요."
+        )
+        sess.history.append(("bot", reply.message))
+        return reply
+
     msg = (
         f"'{filename}' 잘 받았어요. 본문 {text_len:,}자를 읽어서 보관했어요.\n"
-        "이 내용을 근거로 초안을 만들 수 있어요."
+        "이 내용을 근거로 초안을 만들려면 위 후보 중 번호를 알려주세요."
     )
     sess.history.append(("bot", msg))
     return BotReply(
@@ -442,6 +455,16 @@ def _save_profile_to_account(db: Session, sess: ChatSession) -> None:
         db.commit()
 
 
+#: 초안을 다시 만들어 달라는 말. 공고를 이미 고른 상태에서만 본다.
+#: 이게 없으면 초안 생성은 '숫자 입력'으로만 가능해서, 파일을 올린 뒤
+#: "만들어봐" 라고 하면 후보 선택으로 되돌아가는 막다른 길이 생긴다.
+_DRAFT_REQUEST = ("초안", "만들어", "만들자", "만들래", "만들어봐", "작성", "써줘")
+
+
+def _wants_draft(text: str) -> bool:
+    return any(k in text for k in _DRAFT_REQUEST)
+
+
 def handle_message(
     db: Session, session_id: str | None, user_id: uuid.UUID | None, text: str
 ) -> BotReply:
@@ -479,6 +502,12 @@ def handle_message(
     ):
         return _do_archive(db, sess)
 
+    # 2-1) 고른 공고가 있는데 초안을 (다시) 만들어 달라고 하면 바로 만든다.
+    # 파일을 새로 올린 뒤 "만들어봐" 가 대표적인 경우다. 이 분기가 없으면
+    # 아래 일반 대화로 흘러가 공고를 다시 고르라고 되묻는다.
+    if sess.selected_id and _wants_draft(text):
+        return _do_draft(db, sess)
+
     # 3) 자기소개 수집 중이면 답변을 모으고 초안 생성
     if sess.state == ChatState.COLLECT_INTRO and text:
         sess.intro_answers.append(text)
@@ -490,7 +519,10 @@ def handle_message(
     _save_profile_to_account(db, sess)
     total = _scholarship_total(db)
     cands = _search_candidates(db, sess) if sess.profile.income_bracket is not None else []
-    sess.state = ChatState.SELECT if cands else ChatState.COLLECT
+    # 초안까지 만든 뒤에는 상태를 선택 대기로 되돌리지 않는다. 되돌리면 방금
+    # 고른 공고가 화면에서 사라지고 저장 요청도 먹지 않는다.
+    if not (sess.state == ChatState.ARCHIVE and sess.selected_id):
+        sess.state = ChatState.SELECT if cands else ChatState.COLLECT
 
     msg = _llm_reply(sess, text, cands, total)
     sess.history.append(("bot", msg))

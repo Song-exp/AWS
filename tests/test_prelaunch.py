@@ -635,3 +635,75 @@ def test_strip_nul_leaves_other_text_alone():
 
     assert strip_nul("정상 텍스트") == "정상 텍스트"
     assert strip_nul({"a": ["x"], "n": 3, "b": None}) == {"a": ["x"], "n": 3, "b": None}
+
+
+# ---------------- 챗봇 막다른 길 ----------------
+def _chat(client, sid, text):
+    body = {"message": text}
+    if sid:
+        body["session_id"] = sid
+    r = client.post("/chat/message", json=body)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@pytest.fixture()
+def picked(auth_client, db):
+    """공고를 골라 초안까지 만든 상태. 이후 흐름을 여기서부터 검증한다."""
+    db.add(make_scholarship(content_key="k-pick", title="고른 장학금"))
+    db.commit()
+    # 과거 이력이 있어야 '1번' 선택이 바로 초안으로 간다
+    r = auth_client.post(
+        "/applications",
+        json={
+            "scholarship_name": "과거 신청서",
+            "documents": [{"doc_type": "self_intro", "content_text": "공모전 3회 수상"}],
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    first = _chat(auth_client, None, "소득 3분위, 학점 3.8, 서울 거주")
+    sid = first["session_id"]
+    assert first["candidates"], "후보가 나오지 않으면 이후 흐름을 볼 수 없다"
+    picked = _chat(auth_client, sid, "1번")
+    assert picked["state"] == "archive" and picked["draft"], picked
+    return sid
+
+
+def test_draft_can_be_requested_again_after_it_was_made(auth_client, picked):
+    """초안을 만든 뒤 '만들어봐' 가 후보 선택으로 되돌아가면 막다른 길이 된다."""
+    again = _chat(auth_client, picked, "만들어봐")
+    assert again["state"] == "archive", again["state"]
+    assert again["draft"], "초안을 다시 만들어야 한다"
+
+
+def test_free_chat_does_not_forget_the_picked_posting(auth_client, picked):
+    """초안 확인 중 잡담을 해도 고른 공고와 저장 대기가 유지돼야 한다."""
+    chat = _chat(auth_client, picked, "전공은 빅데이터응용학과야")
+    assert chat["state"] == "archive", chat["state"]
+    saved = _chat(auth_client, picked, "저장")
+    assert saved["state"] != "archive", "저장 요청이 먹지 않았다"
+
+
+def test_upload_after_picking_regenerates_the_draft(auth_client, picked):
+    """고른 공고가 있으면 파일을 올린 직후 되묻지 않고 바로 다시 만든다."""
+    r = auth_client.post(
+        "/chat/upload",
+        data={"session_id": picked},
+        files={"file": ("past.txt", "지난 신청서 본문입니다.".encode("utf-8"), "text/plain")},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["draft"], "업로드 후 초안이 다시 나와야 한다"
+    assert body["state"] == "archive", body["state"]
+
+
+def test_upload_without_picking_asks_for_a_number(auth_client):
+    """아직 고르지 않았으면 만들 수 없다. 처리 못 할 안내를 하지 않는다."""
+    r = auth_client.post(
+        "/chat/upload",
+        files={"file": ("past.txt", "본문".encode("utf-8"), "text/plain")},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["draft"] is None
+    assert "번호" in r.json()["message"]
