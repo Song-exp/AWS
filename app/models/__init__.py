@@ -40,7 +40,7 @@ __all__ = [
     "DocumentEmbedding",
     "CrawlRun",
     "CrawlRunStatus",
-    # 페이픽 지도
+    # TMI 지도
     "Store",
     "StoreOffer",
     "StoreCategory",

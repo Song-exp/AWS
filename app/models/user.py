@@ -48,7 +48,7 @@ class User(Base):
     major: Mapped[str | None] = mapped_column(String(100))
     interests: Mapped[list[str]] = mapped_column(StrListType, default=list)
 
-    # --- 지도(페이픽) 개인화 ---
+    # --- 지도(TMI) 개인화 ---
     # 온보딩에서 모으던 값들. 지금까지 localStorage 에만 있어서 기기를 바꾸면
     # 사라졌고 서버가 개인화에 쓰지도 못했다. 계정이 생겼으므로 여기로 올린다.
     preferred_pay_methods: Mapped[list[str]] = mapped_column(StrListType, default=list)

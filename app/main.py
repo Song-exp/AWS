@@ -3,7 +3,7 @@
 실행: uvicorn app.main:app --reload
 
 통합 서비스:
-  - 페이픽(지도): 주변 편의점 간편결제 할인 (/stores)
+  - TMI 지도: 주변 편의점·카페 간편결제 및 카드 할인 (/stores)
   - 장학금 챗봇: 매칭·초안·아카이빙 (/chat, /scholarships, /ai, /applications)
 일간 크롤 스케줄러(매일 00:10 KST)를 lifespan에서 start/stop 한다.
 """
@@ -58,9 +58,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="대학생 혜택 통합 서비스",
+    title="TMI - 대학생 혜택 통합 서비스",
     version="0.2.0",
-    description="주변 결제 할인(지도) + 장학금 매칭·초안 생성(챗봇)을 하나로",
+    description="주변 결제 할인(TMI 지도) + 장학금 매칭·초안 생성(챗봇)을 하나로",
     lifespan=lifespan,
 )
 

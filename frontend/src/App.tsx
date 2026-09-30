@@ -24,7 +24,8 @@ import type { AuthUser, ProfileSettings, UserProfileLocal } from "./types";
 
 type Tab = "map" | "chat" | "community" | "my";
 
-const STORAGE_KEY = "paypick.profile.v1";
+const STORAGE_KEY = "tmi.profile.v1";
+const LEGACY_STORAGE_KEY = "paypick.profile.v1";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -91,7 +92,7 @@ function saveProfile(profile: UserProfileLocal) {
 
 function loadProfile(): UserProfileLocal | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return null;
 
     const stored = JSON.parse(raw) as Partial<UserProfileLocal>;
